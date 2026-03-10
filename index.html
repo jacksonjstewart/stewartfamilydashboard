@@ -140,12 +140,8 @@
   .task-row.done .task-freq { color: #2a3a2a; }
   .task-freq.stamped { color: #3a5a3a; font-style: italic; }
   .task-row.once.done .task-freq.stamped { color: #3a5a3a; }
-  .task-remove {
-    background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.15);
-    color: #ef4444; border-radius: 6px; padding: 3px 8px; cursor: pointer;
-    font-family: 'Outfit', sans-serif; font-size: 11px; display: none; flex-shrink: 0;
-  }
-  body.edit-mode .task-remove { display: block; }
+
+
 
   /* ── TASK WRAPPER ── */
   .task-wrap { margin-bottom: 6px; }
@@ -213,30 +209,89 @@
   #loading-state { color: #1e1e1e; font-size: 13px; font-style: italic; margin-top: 8px; }
 
   /* ── EDIT BUTTON ── */
+  /* ── ADD TASK BUTTON ── */
   #edit-btn {
     background: transparent; border: 1px solid #252525; color: #555;
     border-radius: 8px; padding: 7px 14px; cursor: pointer;
-    font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 1.5px; transition: all 0.2s;
+    font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
+    letter-spacing: 1.5px; transition: all 0.2s; white-space: nowrap;
   }
-  body.edit-mode #edit-btn { border-color: #333; color: #888; }
+  #edit-btn:hover { border-color: #333; color: #888; }
 
-  /* ── ADD FORM ── */
-  #add-form { display: none; flex-direction: column; gap: 8px; padding-top: 16px; border-top: 1px solid #141414; margin-top: 8px; }
-  body.edit-mode #add-form { display: flex; }
-  #add-form label { font-size: 10px; color: #2a2a2a; letter-spacing: 2px; margin-bottom: 4px; }
-  #add-form input, #add-form select {
-    background: #0e0e0e; border: 1px solid #1c1c1c; color: #c8c8c8;
-    border-radius: 8px; padding: 8px 11px; font-family: 'Outfit', sans-serif; font-size: 13px; outline: none;
+  /* ── ADD TASK MODAL OVERLAY ── */
+  #task-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 100;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    align-items: flex-end; justify-content: center;
   }
-  #add-form .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  #add-form #inp-emoji { width: 44px; text-align: center; font-size: 18px; padding: 8px 4px; }
-  #add-form #inp-name { flex: 1; min-width: 120px; }
-  #add-form select { flex: 1; min-width: 100px; }
-  #add-btn {
-    background: #141414; border: 1px solid #1e1e1e; color: #888;
-    border-radius: 8px; padding: 9px; cursor: pointer;
-    font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 1px;
+  #task-modal-overlay.open { display: flex; }
+
+  #task-modal {
+    background: #111; border: 1px solid #1e1e1e;
+    border-radius: 20px 20px 0 0; width: 100%; max-width: 700px;
+    padding: 28px 28px 40px; display: flex; flex-direction: column; gap: 18px;
+    animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
   }
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  .modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 3px; color: #555;
+  }
+  .modal-close {
+    background: none; border: none; color: #333; cursor: pointer;
+    font-size: 18px; padding: 4px 8px; line-height: 1;
+    font-family: 'Outfit', sans-serif; transition: color 0.2s;
+  }
+  .modal-close:hover { color: #888; }
+
+  .modal-field { display: flex; flex-direction: column; gap: 6px; }
+  .modal-label {
+    font-size: 9px; font-weight: 600; letter-spacing: 2px; color: #333;
+  }
+  .modal-row { display: flex; gap: 10px; }
+
+  .modal-input {
+    background: #0d0d0d; border: 1px solid #1e1e1e; color: #e8e8e8;
+    border-radius: 10px; padding: 11px 14px;
+    font-family: 'Outfit', sans-serif; font-size: 14px; outline: none;
+    transition: border-color 0.2s; width: 100%;
+  }
+  .modal-input:focus { border-color: #333; }
+  .modal-input.emoji-input {
+    width: 52px; text-align: center; font-size: 20px;
+    padding: 11px 6px; flex-shrink: 0;
+  }
+  .modal-select {
+    background: #0d0d0d; border: 1px solid #1e1e1e; color: #888;
+    border-radius: 10px; padding: 11px 14px;
+    font-family: 'Outfit', sans-serif; font-size: 13px; outline: none;
+    transition: border-color 0.2s; flex: 1; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+  }
+  .modal-select:focus { border-color: #333; }
+
+  /* Freq sub-options */
+  #modal-freq-opts { display: none; flex-direction: column; gap: 10px; }
+  #modal-freq-opts.visible { display: flex; }
+
+  .modal-submit {
+    background: #1a1a1a; border: 1px solid #2a2a2a; color: #e8e8e8;
+    border-radius: 10px; padding: 13px; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 12px;
+    font-weight: 600; letter-spacing: 2px; transition: all 0.2s;
+    margin-top: 4px;
+  }
+  .modal-submit:hover { background: #222; border-color: #333; }
+  .modal-submit:disabled { opacity: 0.3; cursor: default; }
+  .modal-submit.saving { color: #fb923c; border-color: #fb923c44; }
+  .modal-submit.saved  { color: #4ade80; border-color: #4ade8044; }
 
   /* ── WEEK VIEW ── */
   #week-strip { display: flex; gap: 8px; margin-bottom: 28px; }
@@ -407,8 +462,8 @@
         </div>
         <div id="sync-status">LOADING…</div>
       </div>
-      <!-- Top right: edit button only -->
-      <button id="edit-btn" onclick="toggleEdit()">EDIT</button>
+      <!-- Top right: add task button -->
+      <button id="edit-btn" onclick="openTaskModal()">ADD TASK</button>
     </div>
 
     <!-- Nav -->
@@ -426,39 +481,78 @@
       </div>
       <div id="empty-state">No further tasks scheduled for today.</div>
 
-      <div id="add-form">
-        <label>ADD TASK</label>
-        <div class="row">
-          <input id="inp-emoji" value="✅" maxlength="2"/>
-          <input id="inp-name" placeholder="Task name…"/>
+
+    </div>
+
+    <!-- ADD TASK MODAL -->
+    <div id="task-modal-overlay" onclick="handleOverlayClick(event)">
+      <div id="task-modal">
+        <div class="modal-header">
+          <span class="modal-title">ADD TASK</span>
+          <button class="modal-close" onclick="closeTaskModal()">✕</button>
         </div>
-        <div class="row">
-          <select id="inp-section">
-            <option value="home">Household</option>
-            <option value="vehicle">Vehicle</option>
-            <option value="finance">Finance</option>
-          </select>
-          <select id="inp-type" onchange="onTypeChange()">
-            <option value="recurring">Recurring</option>
-            <option value="once">One Time Only</option>
-          </select>
-          <select id="inp-freq" onchange="onFreqChange()">
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly-sat">Monthly (1st Sat)</option>
-            <option value="monthly-check">Monthly reminder</option>
-          </select>
-          <select id="inp-dow" style="display:none">
-            <option value="0">Sunday</option>
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6" selected>Saturday</option>
-          </select>
+
+        <div class="modal-field">
+          <div class="modal-label">TASK NAME</div>
+          <div class="modal-row">
+            <input id="m-emoji" class="modal-input emoji-input" value="✅" maxlength="2"/>
+            <input id="m-name" class="modal-input" placeholder="What needs to be done…" style="flex:1"/>
+          </div>
         </div>
-        <button id="add-btn" onclick="addTask()">+ ADD TASK</button>
+
+        <div class="modal-row">
+          <div class="modal-field" style="flex:1">
+            <div class="modal-label">SECTION</div>
+            <select id="m-section" class="modal-select">
+              <option value="home">🏠 Household</option>
+              <option value="vehicle">🚗 Vehicle</option>
+              <option value="finance">💳 Finance</option>
+            </select>
+          </div>
+          <div class="modal-field" style="flex:1">
+            <div class="modal-label">TYPE</div>
+            <select id="m-type" class="modal-select" onchange="onModalTypeChange()">
+              <option value="recurring">↻ Recurring</option>
+              <option value="once">★ One Time Only</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="modal-freq-opts" class="visible">
+          <div class="modal-field">
+            <div class="modal-label">FREQUENCY</div>
+            <select id="m-freq" class="modal-select" onchange="onModalFreqChange()">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly-sat">Monthly</option>
+            </select>
+          </div>
+
+          <div id="modal-dow-field" class="modal-field" style="display:none">
+            <div class="modal-label">DAY OF WEEK</div>
+            <select id="m-dow" class="modal-select">
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+          </div>
+
+          <div id="modal-dotm-field" class="modal-field" style="display:none">
+            <div class="modal-label">WHICH SATURDAY</div>
+            <select id="m-dotm" class="modal-select">
+              <option value="monthly-sat">1st Saturday of month</option>
+              <option value="monthly-2nd">2nd Saturday of month</option>
+              <option value="monthly-3rd">3rd Saturday of month</option>
+              <option value="monthly-4th">4th Saturday of month</option>
+            </select>
+          </div>
+        </div>
+
+        <button id="modal-submit" class="modal-submit" onclick="submitTask()">+ ADD TASK</button>
       </div>
     </div>
 
@@ -571,6 +665,9 @@ function isDueOn(task, d) {
     case "biweekly-sat-mirrors": return dow === 6 && isMirrorsWeek(d);
     case "monthly-sat":
     case "monthly-check":        return isNthWeekday(d, 6, 1);
+    case "monthly-2nd":          return isNthWeekday(d, 6, 2);
+    case "monthly-3rd":          return isNthWeekday(d, 6, 3);
+    case "monthly-4th":          return isNthWeekday(d, 6, 4);
     case "yearly":               return task.yearMonth === month && isNthWeekday(d, 6, 1);
     default: return false;
   }
@@ -593,6 +690,9 @@ function freqLabel(task) {
     case "biweekly-sat-mirrors": return "Every other Saturday";
     case "monthly-sat":
     case "monthly-check":        return "Monthly · 1st Saturday";
+    case "monthly-2nd":          return "Monthly · 2nd Saturday";
+    case "monthly-3rd":          return "Monthly · 3rd Saturday";
+    case "monthly-4th":          return "Monthly · 4th Saturday";
     case "yearly":               return "Yearly · " + MONTHS[(task.yearMonth||1) - 1];
     case "once":                 return "One time only";
     default: return task.type === "once" ? "One time only" : "";
@@ -769,7 +869,7 @@ let doneLog          = loadDone();
 let permanentHistory = {};
 let rawHistory       = [];
 let pushForwardList  = loadPushFwd();
-let editMode         = false;
+
 let currentView      = 'today';
 let selectedWeekDay  = 0; // index into weekDates array
 let historyRangeDays = 30;
@@ -1247,38 +1347,100 @@ function toggleTask(id) {
   else { doneLog[key] = new Date().toISOString(); }
   saveDone(doneLog); render();
 }
-function toggleEdit() {
-  editMode = !editMode;
-  document.body.classList.toggle("edit-mode", editMode);
-  document.getElementById("edit-btn").textContent = editMode ? "DONE" : "EDIT";
+
+// ── Modal ──────────────────────────────────────────────────────────────────────
+function openTaskModal() {
+  document.getElementById("task-modal-overlay").classList.add("open");
+  document.getElementById("m-name").focus();
 }
-function onTypeChange() {
-  const isOnce = document.getElementById("inp-type").value === "once";
-  document.getElementById("inp-freq").style.display = isOnce ? "none" : "block";
-  document.getElementById("inp-dow").style.display  = "none";
+function closeTaskModal() {
+  document.getElementById("task-modal-overlay").classList.remove("open");
+  resetModal();
 }
-function onFreqChange() {
-  document.getElementById("inp-dow").style.display = document.getElementById("inp-freq").value === "weekly" ? "block" : "none";
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById("task-modal-overlay")) closeTaskModal();
 }
-function addTask() {
-  const name = document.getElementById("inp-name").value.trim();
-  if (!name) return;
-  const type = document.getElementById("inp-type").value;
+function resetModal() {
+  document.getElementById("m-name").value  = "";
+  document.getElementById("m-emoji").value = "✅";
+  document.getElementById("m-section").value = "home";
+  document.getElementById("m-type").value  = "recurring";
+  document.getElementById("m-freq").value  = "daily";
+  document.getElementById("modal-freq-opts").classList.add("visible");
+  document.getElementById("modal-dow-field").style.display  = "none";
+  document.getElementById("modal-dotm-field").style.display = "none";
+  const btn = document.getElementById("modal-submit");
+  btn.textContent = "+ ADD TASK";
+  btn.disabled = false;
+  btn.className = "modal-submit";
+}
+function onModalTypeChange() {
+  const isOnce = document.getElementById("m-type").value === "once";
+  document.getElementById("modal-freq-opts").classList.toggle("visible", !isOnce);
+}
+function onModalFreqChange() {
+  const freq = document.getElementById("m-freq").value;
+  document.getElementById("modal-dow-field").style.display  = freq === "weekly"      ? "block" : "none";
+  document.getElementById("modal-dotm-field").style.display = freq === "monthly-sat" ? "block" : "none";
+}
+
+async function submitTask() {
+  const name = document.getElementById("m-name").value.trim();
+  if (!name) { document.getElementById("m-name").focus(); return; }
+
+  const type   = document.getElementById("m-type").value;
   const isOnce = type === "once";
+  const freq   = isOnce ? "once" : document.getElementById("m-freq").value;
+
+  // Resolve actual freq value for monthly
+  let resolvedFreq = freq;
+  if (freq === "monthly-sat") {
+    resolvedFreq = document.getElementById("m-dotm").value;
+  }
+
   const task = {
-    id: "u_"+Date.now(), name,
-    emoji:   document.getElementById("inp-emoji").value || "✅",
-    freq:    isOnce ? "once" : document.getElementById("inp-freq").value,
-    section: document.getElementById("inp-section").value,
-    type,
+    name,
+    emoji:   document.getElementById("m-emoji").value || "✅",
+    section: document.getElementById("m-section").value,
+    freq:    resolvedFreq,
+    type:    type,
+    notes:   "",
   };
-  if (!isOnce && task.freq === "weekly") task.dow = parseInt(document.getElementById("inp-dow").value);
-  customTasks.push(task); saveCustom(customTasks);
-  document.getElementById("inp-name").value = ""; render();
-}
-function removeTask(id, e) {
-  e.stopPropagation();
-  customTasks = customTasks.filter(t => t.id !== id); saveCustom(customTasks); render();
+  if (!isOnce && resolvedFreq === "weekly") {
+    task.dow = parseInt(document.getElementById("m-dow").value);
+  }
+
+  // Update button state
+  const btn = document.getElementById("modal-submit");
+  btn.textContent = "SAVING…";
+  btn.disabled = true;
+  btn.className = "modal-submit saving";
+
+  try {
+    const res  = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "addTask", task })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Failed");
+
+    btn.textContent = "✓ ADDED";
+    btn.className = "modal-submit saved";
+
+    // Close modal after brief confirmation
+    setTimeout(() => {
+      closeTaskModal();
+      // Re-sync sheet so new task appears
+      syncFromSheet();
+    }, 900);
+
+  } catch(err) {
+    btn.textContent = "RETRY";
+    btn.disabled = false;
+    btn.className = "modal-submit";
+    console.warn("Add task failed:", err);
+  }
 }
 
 // ─── WEATHER ─────────────────────────────────────────────────────────────────
