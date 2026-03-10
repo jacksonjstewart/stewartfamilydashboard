@@ -42,34 +42,53 @@
   }
 
   /* ── CLOCK ── */
+  /* ── CLOCK ── */
   #clock-day {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 52px; font-weight: 300; color: #ffffff;
-    line-height: 1; letter-spacing: -1px;
+    font-size: 58px; font-weight: 300; color: #ffffff;
+    line-height: 1; letter-spacing: -1.5px;
   }
-  #clock-date { font-size: 16px; font-weight: 400; color: #aaa; margin-top: 5px; letter-spacing: 0.3px; }
-  #clock-time { font-size: 14px; font-weight: 400; color: #666; margin-top: 3px; letter-spacing: 2px; }
-  #clock-time span { font-size: 14px; color: #555; margin-left: 2px; letter-spacing: 1px; }
-  #sync-status { font-size: 9px; color: #333; letter-spacing: 1.5px; margin-top: 5px; transition: color 0.4s; }
-  #sync-status.syncing { color: #fb923c; }
-  #sync-status.ok      { color: #333; }
-  #sync-status.error   { color: #555; }
+  /* Second row: date + divider + weather side by side */
+  #clock-row2 {
+    display: flex; align-items: baseline; gap: 18px; margin-top: 6px; flex-wrap: wrap;
+  }
+  #clock-date {
+    font-size: 17px; font-weight: 400; color: #bbb; letter-spacing: 0.2px;
+  }
+  #clock-time {
+    font-size: 15px; font-weight: 400; color: #777; letter-spacing: 1.5px;
+  }
+  #clock-time span { font-size: 15px; color: #666; margin-left: 1px; letter-spacing: 1px; }
 
-  /* ── WEATHER ── */
+  /* Subtle vertical divider between date/time and weather */
+  #header-divider {
+    width: 1px; height: 28px; background: #222;
+    align-self: center; flex-shrink: 0;
+  }
+
+  /* Weather inline with date */
   #weather-widget {
-    display: flex; flex-direction: column; align-items: flex-end;
-    justify-content: flex-end; gap: 3px;
+    display: flex; align-items: baseline; gap: 10px;
     opacity: 0; transition: opacity 0.6s;
   }
   #weather-widget.loaded { opacity: 1; }
   #weather-temp {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 42px; font-weight: 300; color: #ffffff;
+    font-size: 36px; font-weight: 300; color: #cccccc;
     line-height: 1; letter-spacing: -1px;
   }
-  #weather-temp span { font-size: 18px; color: #555; letter-spacing: 0; }
-  #weather-desc { font-size: 12px; color: #666; letter-spacing: 0.5px; text-align: right; }
-  #weather-wind { font-size: 10px; color: #444; letter-spacing: 0.5px; text-align: right; }
+  #weather-temp span { font-size: 16px; color: #555; letter-spacing: 0; }
+  #weather-info { display: flex; flex-direction: column; gap: 1px; }
+  #weather-desc { font-size: 12px; color: #666; letter-spacing: 0.3px; }
+  #weather-wind { font-size: 10px; color: #444; letter-spacing: 0.3px; }
+
+  #sync-status {
+    font-size: 9px; color: #333; letter-spacing: 1.5px;
+    margin-top: 6px; transition: color 0.4s;
+  }
+  #sync-status.syncing { color: #fb923c; }
+  #sync-status.ok      { color: #333; }
+  #sync-status.error   { color: #555; }
 
   /* ── NAV TABS ── */
   #nav {
@@ -341,10 +360,11 @@
     #sec-bars { width: 100%; }
     #footer-note { width: 100%; }
     #left { padding: 28px 20px; }
-    #clock-day  { font-size: 38px; }
+    #clock-day  { font-size: 40px; }
     #clock-date { font-size: 14px; }
     #clock-time { font-size: 12px; }
-    #weather-temp { font-size: 32px; }
+    #weather-temp { font-size: 28px; }
+    #header-divider { height: 22px; }
     #week-strip { gap: 5px; }
     .week-day { padding: 10px 3px; }
     .week-day-num { font-size: 20px; }
@@ -352,10 +372,11 @@
   @media (max-width: 480px) {
     #left { padding: 20px 16px; }
     #right { padding: 20px 16px 28px; }
-    #clock-day  { font-size: 30px; }
+    #clock-day  { font-size: 32px; }
     #clock-date { font-size: 12px; }
     #clock-time { font-size: 11px; }
-    #weather-temp { font-size: 26px; }
+    #weather-temp { font-size: 24px; }
+    #header-divider { height: 18px; }
     #ring-wrap { width: min(120px, 32vw); }
     .task-row { padding: 10px 12px; }
   }
@@ -366,23 +387,28 @@
 
   <div id="left">
     <!-- Header -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:28px;">
-      <!-- Left: day name + date + time + sync -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;">
+      <!-- Left: full clock + inline weather -->
       <div>
         <div id="clock-day">Monday</div>
-        <div id="clock-date">March 9, 2026</div>
-        <div id="clock-time">12:00<span>am</span></div>
+        <div id="clock-row2">
+          <div>
+            <div id="clock-date">March 9, 2026</div>
+            <div id="clock-time">12:00<span>am</span></div>
+          </div>
+          <div id="header-divider"></div>
+          <div id="weather-widget">
+            <div id="weather-temp">—<span>°C</span></div>
+            <div id="weather-info">
+              <div id="weather-desc">—</div>
+              <div id="weather-wind">—</div>
+            </div>
+          </div>
+        </div>
         <div id="sync-status">LOADING…</div>
       </div>
-      <!-- Right: weather aligned to same baseline, edit button floated above -->
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
-        <button id="edit-btn" onclick="toggleEdit()">EDIT</button>
-        <div id="weather-widget">
-          <div id="weather-temp">—<span>°C</span></div>
-          <div id="weather-desc">—</div>
-          <div id="weather-wind">—</div>
-        </div>
-      </div>
+      <!-- Top right: edit button only -->
+      <button id="edit-btn" onclick="toggleEdit()">EDIT</button>
     </div>
 
     <!-- Nav -->
