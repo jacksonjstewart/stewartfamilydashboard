@@ -271,11 +271,28 @@
   .history-bar-fill { height: 100%; border-radius: 99px; opacity: 0.7; }
 
   /* ── RIGHT COLUMN ── */
-  #ring-wrap { position: relative; width: 220px; height: 220px; }
-  #ring-wrap svg { position: absolute; transform: rotate(-90deg); }
-  #ring-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  #ring-pct { font-family: 'Cormorant Garamond', serif; font-size: 56px; font-weight: 300; color: #ffffff; line-height: 1; letter-spacing: -3px; }
-  #ring-pct span { font-size: 22px; color: #555; letter-spacing: 0; }
+  #ring-wrap {
+    position: relative;
+    width: min(200px, 80%);
+    aspect-ratio: 1;
+    flex-shrink: 0;
+  }
+  #ring-wrap svg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);
+  }
+  #ring-inner {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  #ring-pct {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(32px, 4vw, 56px);
+    font-weight: 300; color: #ffffff; line-height: 1; letter-spacing: -3px;
+  }
+  #ring-pct span { font-size: clamp(14px, 1.6vw, 22px); color: #555; letter-spacing: 0; }
   #ring-label { font-size: 10px; color: #555; letter-spacing: 2px; margin-top: 3px; }
 
   #motivate-wrap { text-align: center; margin-top: 28px; margin-bottom: 32px; }
@@ -300,9 +317,7 @@
   @media (max-width: 768px) {
     #app { grid-template-columns: 1fr; grid-template-rows: auto auto; }
     #right { position: static; height: auto; padding: 28px 24px 36px; border-top: 1px solid #111; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 24px; }
-    #ring-wrap { width: 140px; height: 140px; flex-shrink: 0; }
-    #ring-pct { font-size: 36px; }
-    #ring-pct span { font-size: 15px; }
+    #ring-wrap { width: min(140px, 35vw); }
     #motivate-wrap { margin: 0; text-align: left; flex: 1; min-width: 160px; }
     #motivate-msg { font-size: 24px; }
     #stats { width: 100%; }
@@ -322,8 +337,7 @@
     #clock-day  { font-size: 30px; }
     #clock-date { font-size: 12px; }
     #clock-time { font-size: 11px; }
-    #ring-wrap { width: 120px; height: 120px; }
-    #ring-pct { font-size: 30px; }
+    #ring-wrap { width: min(120px, 32vw); }
     .task-row { padding: 10px 12px; }
   }
 </style>
@@ -417,7 +431,7 @@
   <!-- RIGHT COLUMN -->
   <div id="right">
     <div id="ring-wrap">
-      <svg width="220" height="220">
+      <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
         <circle cx="110" cy="110" r="100" fill="none" stroke="#1a1a1a" stroke-width="13"/>
         <circle id="ring-fill" cx="110" cy="110" r="100" fill="none" stroke="#4ade80" stroke-width="13"
           stroke-dasharray="628.3" stroke-dashoffset="628.3" stroke-linecap="round"
