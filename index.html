@@ -202,6 +202,37 @@
   .type-header.once-header.once-all-done { color: #4ade80; }
   .type-header.once-header.once-all-done::after { background: #1a3a1a; }
 
+  /* ── OVERDUE OTO ── */
+  .task-row.overdue {
+    background: rgba(251,146,60,0.06);
+    border-color: rgba(251,146,60,0.2);
+  }
+  .task-row.overdue .task-name { color: #d97b3a; }
+  .task-row.overdue .task-freq { color: #7a4a20; }
+  .task-row.overdue .task-checkbox { border-color: #5a3010; }
+  .task-row.overdue.done { background: rgba(74,222,128,0.04); border-color: rgba(74,222,128,0.12); }
+  .task-row.overdue.done .task-name { color: #2a2a2a; text-decoration: line-through; }
+  .task-row.overdue.done .task-freq { color: #2a3a2a; }
+  .task-row.overdue.done .task-checkbox { border-color: #4ade80; background: #4ade80; }
+  .overdue-pip {
+    width: 6px; height: 6px; border-radius: 99px;
+    background: #fb923c; flex-shrink: 0; align-self: center; opacity: 0.8;
+  }
+
+  /* ── OVERDUE OTO ── */
+  .task-row.overdue { background: rgba(251,146,60,0.06); border-color: rgba(251,146,60,0.2); }
+  .task-row.overdue .task-name { color: #d4844a; }
+  .task-row.overdue .task-freq { color: #7a4a20; }
+  .task-row.overdue .task-checkbox { border-color: #5a3010; }
+  .task-row.overdue.done { background: rgba(74,222,128,0.04); border-color: rgba(74,222,128,0.12); }
+  .task-row.overdue.done .task-name { color: #2a2a2a; }
+  .task-row.overdue.done .task-freq { color: #2a3a2a; }
+  .overdue-badge {
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    color: #fb923c; border: 1px solid rgba(251,146,60,0.3);
+    border-radius: 4px; padding: 2px 5px; flex-shrink: 0; align-self: center;
+  }
+
   /* ── VIEW LABELS ── */
   .view-label { font-size: 11px; color: #444; letter-spacing: 2.5px; margin-bottom: 20px; font-weight: 600; }
 
@@ -267,6 +298,9 @@
   .modal-input.emoji-input {
     width: 52px; text-align: center; font-size: 20px;
     padding: 11px 6px; flex-shrink: 0;
+  }
+  input[type="date"].modal-input {
+    color-scheme: dark;
   }
   .modal-select {
     background: #0d0d0d; border: 1px solid #1e1e1e; color: #888;
@@ -518,6 +552,17 @@
           </div>
         </div>
 
+        <div id="modal-date-field" class="modal-field" style="display:none">
+          <div class="modal-label">TARGET DATE <span style="color:#333;font-weight:400;letter-spacing:0">— optional, leave blank to show daily</span></div>
+          <input id="m-targetdate" class="modal-input" type="date" style="color-scheme:dark"/>
+        </div>
+
+        <div id="modal-date-field" class="modal-field" style="display:none">
+          <div class="modal-label">TARGET DATE</div>
+          <input id="m-targetdate" class="modal-input" type="date"/>
+          <div style="font-size:10px;color:#333;margin-top:4px;letter-spacing:1px">Leave blank to show every day until completed</div>
+        </div>
+
         <div id="modal-freq-opts" class="visible">
           <div class="modal-field">
             <div class="modal-label">FREQUENCY</div>
@@ -674,8 +719,42 @@ function isDueOn(task, d) {
 }
 
 function isDueToday(task, d) {
+  if (task.type === 'once') {
+    const dk = dateKey(d);
+    if (!task.targetDate) return true; // no target date — show daily until done
+
+    // Push-forward overrides — show if in pushForwardList
+    if (pushForwardList.includes(task.id)) return true;
+
+    // Show on target date
+    if (task.targetDate === dk) return true;
+
+    // Grace day — show the day after target if not completed
+    const target = new Date(task.targetDate + "T00:00:00");
+    const grace  = addDays(target, 1);
+    if (dateKey(grace) === dk) return true;
+
+    return false;
+  }
   if (pushForwardList.includes(task.id)) return true;
   return isDueOn(task, d);
+}
+
+function isOTOOverdue(task) {
+  // Returns true if today is the grace day (day after target)
+  if (task.type !== 'once' || !task.targetDate) return false;
+  const target = new Date(task.targetDate + "T00:00:00");
+  const grace  = addDays(target, 1);
+  return dateKey(grace) === todayKey;
+}
+
+function isOTOMissed(task) {
+  // Returns true if today is past the grace day and task has a targetDate
+  if (task.type !== 'once' || !task.targetDate) return false;
+  const target = new Date(task.targetDate + "T00:00:00");
+  const grace  = addDays(target, 1);
+  const graceKey = dateKey(grace);
+  return todayKey > graceKey && !pushForwardList.includes(task.id);
 }
 
 function freqLabel(task) {
@@ -694,7 +773,12 @@ function freqLabel(task) {
     case "monthly-3rd":          return "Monthly · 3rd Saturday";
     case "monthly-4th":          return "Monthly · 4th Saturday";
     case "yearly":               return "Yearly · " + MONTHS[(task.yearMonth||1) - 1];
-    case "once":                 return "One time only";
+    case "once":
+      if (task.targetDate) {
+        const td = new Date(task.targetDate + "T00:00:00");
+        return "Scheduled · " + MONTHS[td.getMonth()].slice(0,3) + " " + td.getDate() + ", " + td.getFullYear();
+      }
+      return "One time only";
     default: return task.type === "once" ? "One time only" : "";
   }
 }
@@ -749,6 +833,7 @@ function parseCSV(text) {
       notes:       rawNotes,
       pushforward: (obj["pushforward"] || "").toLowerCase().trim(),
       type:        taskType,
+      targetDate:  (obj["targetdate"] || "").trim(),
     };
   }).filter(t => (t.id || t.type === 'once') && t.name)
     .map(t => {
@@ -786,12 +871,12 @@ async function fetchHistory() {
   if (currentView === 'history') renderHistory();
 }
 
-async function commitToHistory(entries) {
+async function commitToHistory(entries, missedOTOs) {
   try {
     await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ action: "commit", entries })
+      body: JSON.stringify({ action: "commit", entries, missedOTOs: missedOTOs || [] })
     });
     entries.forEach(entry => {
       if (!permanentHistory[entry.taskId] ||
@@ -904,19 +989,33 @@ function checkMidnightCommit() {
 
 async function performCommit() {
   const allTasks = [...sheetTasks, ...customTasks];
-  const entries = [];
+  const entries  = [];
   Object.keys(doneLog).forEach(key => {
     if (key.endsWith("_" + todayKey)) {
       entries.push({ taskId: key.replace("_" + todayKey, ""), completedAt: doneLog[key], dateKey: todayKey });
     }
   });
-  if (entries.length > 0) await commitToHistory(entries);
+
+  // Find OTO tasks on their grace day that were NOT completed — mark as missed
+  const missedOTOs = allTasks.filter(task => {
+    if (task.type !== 'once' || !task.targetDate) return false;
+    if (pushForwardList.includes(task.id)) return false; // pushforward — don't miss yet
+    const isDone = !!doneLog[task.id + "_" + todayKey];
+    if (isDone) return false;
+    return isOTOOverdue(task); // grace day ending tonight
+  }).map(task => ({ taskId: task.id, dateKey: todayKey }));
+
+  await commitToHistory(entries, missedOTOs);
+
+  // Push-forward: recurring tasks + OTO tasks with pushforward=yes
   const newPushFwd = [];
   allTasks.forEach(task => {
     if (task.pushforward === "yes" && !doneLog[task.id + "_" + todayKey]) newPushFwd.push(task.id);
   });
   const merged = [...new Set([...pushForwardList, ...newPushFwd])];
-  savePushFwd(merged.filter(id => !entries.find(e => e.taskId === id)));
+  // Remove completed and newly missed (missed go to history, not forward)
+  const allDoneOrMissed = new Set([...entries.map(e => e.taskId), ...missedOTOs.map(m => m.taskId)]);
+  savePushFwd(merged.filter(id => !allDoneOrMissed.has(id)));
 }
 
 // ─── CLOCK ────────────────────────────────────────────────────────────────────
@@ -952,16 +1051,19 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
   const wrap = document.createElement("div");
   wrap.className = "task-wrap";
   const row = document.createElement("div");
+  const isOverdue = !isDone && isOnce && task.targetDate && isOTOOverdue(task);
   row.className = "task-row"
     + (isDone     ? " done"     : "")
     + (hasNotes   ? ""          : " no-notes")
     + (isOnce     ? " once"     : "")
+    + (isOverdue  ? " overdue"  : "")
     + (isReadOnly ? " readonly" : "");
   row.innerHTML = `
     <div class="task-checkbox"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 3.5l3 3 5-5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <span class="task-emoji">${task.emoji}</span>
-    <div style="flex:1"><div class="task-name">${task.name}</div><div class="task-freq">${stampText || freqLabel(task)}</div></div>
+    <div style="flex:1"><div class="task-name">${task.name}</div><div class="task-freq">${isOverdue ? "Due yesterday · overdue" : (stampText || freqLabel(task))}</div></div>
     ${pillHTML}
+    ${isOverdue ? '<span class="overdue-badge">OVERDUE</span>' : ''}
     ${isCustom && !isReadOnly ? `<button class="task-remove" onclick="removeTask('${task.id}',event)">\u2715</button>` : ""}
     ${hasNotes ? `<div class="task-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>` : ""}`;
 
@@ -1367,8 +1469,10 @@ function resetModal() {
   document.getElementById("m-type").value  = "recurring";
   document.getElementById("m-freq").value  = "daily";
   document.getElementById("modal-freq-opts").classList.add("visible");
+  document.getElementById("modal-date-field").style.display = "none";
   document.getElementById("modal-dow-field").style.display  = "none";
   document.getElementById("modal-dotm-field").style.display = "none";
+  document.getElementById("m-targetdate").value = "";
   const btn = document.getElementById("modal-submit");
   btn.textContent = "+ ADD TASK";
   btn.disabled = false;
@@ -1377,6 +1481,11 @@ function resetModal() {
 function onModalTypeChange() {
   const isOnce = document.getElementById("m-type").value === "once";
   document.getElementById("modal-freq-opts").classList.toggle("visible", !isOnce);
+  document.getElementById("modal-date-field").style.display = isOnce ? "block" : "none";
+  if (isOnce) {
+    // Default to today
+    document.getElementById("m-targetdate").value = todayKey;
+  }
 }
 function onModalFreqChange() {
   const freq = document.getElementById("m-freq").value;
@@ -1400,11 +1509,12 @@ async function submitTask() {
 
   const task = {
     name,
-    emoji:   document.getElementById("m-emoji").value || "✅",
-    section: document.getElementById("m-section").value,
-    freq:    resolvedFreq,
-    type:    type,
-    notes:   "",
+    emoji:      document.getElementById("m-emoji").value || "✅",
+    section:    document.getElementById("m-section").value,
+    freq:       resolvedFreq,
+    type:       type,
+    notes:      "",
+    targetDate: isOnce ? (document.getElementById("m-targetdate").value || "") : "",
   };
   if (!isOnce && resolvedFreq === "weekly") {
     task.dow = parseInt(document.getElementById("m-dow").value);
