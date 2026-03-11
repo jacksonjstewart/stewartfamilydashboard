@@ -42,50 +42,72 @@
   }
 
   #right {
-    padding: 36px 28px;
+    padding: 48px 28px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     background: var(--bg-right, #0d0d0d);
     position: sticky;
     top: 0;
     height: 100vh;
     transition: background 8s ease;
   }
+  /* Group everything below the brand together so space-between puts brand at top-third */
+  #right-main {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    flex: 1; gap: 0; width: 100%;
+  }
 
   /* ── FAMILY BRAND ── */
   #family-brand {
-    display: flex; flex-direction: column;
+    display: inline-flex;
+    flex-direction: column;
     align-items: flex-start;
-    margin-bottom: 24px; gap: 0;
-    padding: 0 4px;
+    gap: 0;
+    position: relative;
   }
   #brand-the {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 13px; font-weight: 300;
-    color: #aaaaaa; letter-spacing: 3px;
-    line-height: 1.2;
+    font-size: 11px; font-weight: 300;
+    font-style: italic;
+    color: #ffffff;
+    letter-spacing: 1.5px;
+    line-height: 1;
+    margin-bottom: 0px;
+    padding-left: 2px;
     align-self: flex-start;
-    margin-left: 3px;
+    opacity: 0.75;
   }
   #brand-stewart {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 42px; font-weight: 300;
-    color: #aaaaaa; letter-spacing: 3px;
-    line-height: 1;
+    font-size: 52px; font-weight: 300;
+    color: #ffffff; letter-spacing: -1px;
+    line-height: 0.95;
+  }
+  #brand-family-wrap {
+    align-self: flex-end;
+    display: flex; align-items: baseline; gap: 3px;
   }
   #brand-family {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 13px; font-weight: 300;
-    color: #aaaaaa; letter-spacing: 3px;
-    line-height: 1.2;
+    font-size: 19px; font-weight: 300;
+    color: #ffffff; letter-spacing: 1px;
+    line-height: 1;
+    opacity: 0.85;
+  }
+  #brand-copy {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 10px; font-weight: 300;
+    color: #ffffff; opacity: 0.4;
+    line-height: 1;
     align-self: flex-end;
-    margin-right: 3px;
+    margin-bottom: 2px;
   }
   #brand-rule {
     width: 100%; height: 1px;
-    background: linear-gradient(90deg, transparent, #222, transparent);
+    background: linear-gradient(90deg, transparent, #333, transparent);
     margin-top: 10px;
   }
 
@@ -683,11 +705,15 @@
   <!-- RIGHT COLUMN -->
   <div id="right">
     <div id="family-brand">
-      <div id="brand-the">The</div>
+      <div id="brand-the">the</div>
       <div id="brand-stewart">Stewart</div>
-      <div id="brand-family">Family</div>
+      <div id="brand-family-wrap">
+        <div id="brand-family">Family</div>
+        <div id="brand-copy">©</div>
+      </div>
       <div id="brand-rule"></div>
     </div>
+    <div id="right-main">
     <div id="greeting-wrap">
       <div id="greeting-text"></div>
     </div>
@@ -717,6 +743,7 @@
 
     <div id="sec-bars"></div>
     <div id="footer-note">Syncs from Google Sheets · Resets daily · Tap to mark done</div>
+    </div><!-- end right-main -->
   </div>
 </div>
 
