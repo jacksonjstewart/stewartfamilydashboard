@@ -56,16 +56,39 @@
 
   /* ── FAMILY BRAND ── */
   #family-brand {
-    text-align: center; margin-bottom: 20px;
+    display: flex; flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 24px; gap: 0;
+    padding: 0 4px;
   }
-  #family-name {
+  #brand-the {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px; font-weight: 400;
+    color: #555; letter-spacing: 5px;
+    text-transform: uppercase;
+    align-self: flex-start;
+    margin-left: 2px;
+    margin-bottom: 1px;
+  }
+  #brand-stewart {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 22px; font-weight: 300; color: #555;
-    letter-spacing: 1px; line-height: 1;
+    font-size: 38px; font-weight: 300;
+    color: #ffffff; letter-spacing: 4px;
+    line-height: 1; text-transform: uppercase;
   }
-  #family-sub {
-    font-size: 9px; color: #2a2a2a; letter-spacing: 3px;
-    margin-top: 4px; font-family: 'Outfit', sans-serif;
+  #brand-family {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px; font-weight: 400;
+    color: #555; letter-spacing: 5px;
+    text-transform: uppercase;
+    align-self: flex-end;
+    margin-right: 2px;
+    margin-top: 2px;
+  }
+  #brand-rule {
+    width: 100%; height: 1px;
+    background: linear-gradient(90deg, transparent, #2a2a2a, transparent);
+    margin-top: 10px;
   }
 
   /* ── GREETING ── */
@@ -662,8 +685,10 @@
   <!-- RIGHT COLUMN -->
   <div id="right">
     <div id="family-brand">
-      <div id="family-name">The Stewart Family</div>
-      <div id="family-sub">© 2026</div>
+      <div id="brand-the">The</div>
+      <div id="brand-stewart">Stewart</div>
+      <div id="brand-family">Family ©</div>
+      <div id="brand-rule"></div>
     </div>
     <div id="greeting-wrap">
       <div id="greeting-text"></div>
