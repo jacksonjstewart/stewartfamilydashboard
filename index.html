@@ -87,7 +87,7 @@
   }
   #brand-the {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 11px; font-weight: 300;
+    font-size: 12px; font-weight: 300;
     font-style: italic;
     color: #ffffff;
     letter-spacing: 1.5px;
@@ -99,7 +99,7 @@
   }
   #brand-stewart {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 52px; font-weight: 300;
+    font-size: 58px; font-weight: 300;
     color: #ffffff; letter-spacing: -1px;
     line-height: 0.95;
   }
@@ -109,14 +109,14 @@
   }
   #brand-family {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 19px; font-weight: 300;
+    font-size: 21px; font-weight: 300;
     color: #ffffff; letter-spacing: 1px;
     line-height: 1;
     opacity: 0.85;
   }
   #brand-copy {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 10px; font-weight: 300;
+    font-size: 11px; font-weight: 300;
     color: #ffffff; opacity: 0.4;
     line-height: 1;
     align-self: flex-end;
@@ -809,7 +809,7 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="version-tag">v0.9.4 · pre-release</div>
+  <div id="version-tag">v0.9.5 · pre-release</div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -1228,15 +1228,19 @@ async function syncTodayState() {
     });
 
     // REMOVE: entries in local doneLog for today that are no longer in sheet
-    // Skip any taskId currently being written (race condition protection)
-    Object.keys(doneLog).forEach(key => {
-      if (!key.endsWith("_" + todayKey)) return;
-      const taskId = key.replace("_" + todayKey, "");
-      if (!sheetChecked.has(taskId) && !_pendingWrites.has(taskId)) {
-        delete doneLog[key];
-        changed = true;
-      }
-    });
+    // Guard 1: skip taskIds currently being written (in-flight protection)
+    // Guard 2: skip all removals within 5s of any local toggle (rapid-click protection)
+    const sinceLastToggle = Date.now() - (_lastToggleTime || 0);
+    if (sinceLastToggle > 5000) {
+      Object.keys(doneLog).forEach(key => {
+        if (!key.endsWith("_" + todayKey)) return;
+        const taskId = key.replace("_" + todayKey, "");
+        if (!sheetChecked.has(taskId) && !_pendingWrites.has(taskId)) {
+          delete doneLog[key];
+          changed = true;
+        }
+      });
+    }
 
     if (changed) { saveDone(doneLog); render(); }
   } catch(err) { console.warn("syncTodayState failed:", err); }
@@ -2127,8 +2131,10 @@ function setRange(days, btn) {
   btn.classList.add("active");
   renderHistory();
 }
-let _reorderTimer = null;
+let _reorderTimer  = null;
+let _lastToggleTime = 0;
 function toggleTask(id) {
+  _lastToggleTime = Date.now(); // stamp so sync won't remove in-flight state
   const key = id + "_" + todayKey;
   if (doneLog[key]) {
     delete doneLog[key];
