@@ -521,6 +521,33 @@
   .modal-submit.saving { color: #fb923c; border-color: #fb923c44; }
   .modal-submit.saved  { color: #4ade80; border-color: #4ade8044; }
 
+  /* ── DAY PILLS (multi-select weekday toggle) ── */
+  .day-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .day-pill {
+    background: none; border: 1px solid #1e1e1e; color: #333;
+    border-radius: 99px; padding: 5px 11px; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 9px; font-weight: 600;
+    letter-spacing: 1.5px; transition: all 0.15s; user-select: none;
+  }
+  .day-pill.active { border-color: #4ade80; color: #4ade80; background: rgba(74,222,128,0.06); }
+  .day-pill:hover:not(.active) { border-color: #2a2a2a; color: #555; }
+
+  /* ── MONTH PILLS (ordinal / dotm toggle) ── */
+  .mode-pills { display: flex; gap: 6px; margin-bottom: 10px; }
+  .mode-pill {
+    background: none; border: 1px solid #1a1a1a; color: #2a2a2a;
+    border-radius: 99px; padding: 4px 12px; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 9px; font-weight: 600;
+    letter-spacing: 1.5px; transition: all 0.15s;
+  }
+  .mode-pill.active { border-color: #444; color: #777; }
+
+  /* ── NUMBER INPUT (day of month) ── */
+  .modal-input.num-input { width: 72px; text-align: center; }
+
+  /* ── ORDINAL SELECT ── */
+  .ordinal-row { display: flex; gap: 8px; align-items: center; }
+
   /* ── WEEK VIEW ── */
   #week-strip { display: flex; gap: 8px; margin-bottom: 28px; }
   .week-day {
@@ -862,6 +889,7 @@
           <button class="modal-close" onclick="closeTaskModal()">✕</button>
         </div>
 
+        <!-- Name + emoji -->
         <div class="modal-field">
           <div class="modal-label">TASK NAME</div>
           <div class="modal-row">
@@ -870,6 +898,7 @@
           </div>
         </div>
 
+        <!-- Section + Type -->
         <div class="modal-row">
           <div class="modal-field" style="flex:1">
             <div class="modal-label">SECTION</div>
@@ -888,44 +917,125 @@
           </div>
         </div>
 
+        <!-- OTO: target date -->
         <div id="modal-date-field" class="modal-field" style="display:none">
-          <div class="modal-label">TARGET DATE <span style="color:#333;font-weight:400;letter-spacing:0">— leave blank to show daily until done</span></div>
+          <div class="modal-label">TARGET DATE <span style="color:#333;font-weight:400;letter-spacing:0">— leave blank to show until done</span></div>
           <input id="m-targetdate" class="modal-input" type="date" style="color-scheme:dark"/>
         </div>
 
-        <div id="modal-freq-opts" class="visible">
+        <!-- Recurring options -->
+        <div id="modal-freq-opts">
+
+          <!-- Frequency selector -->
           <div class="modal-field">
             <div class="modal-label">FREQUENCY</div>
             <select id="m-freq" class="modal-select" onchange="onModalFreqChange()">
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
-              <option value="monthly-sat">Monthly</option>
+              <option value="biweekly">Every other week</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
             </select>
           </div>
 
-          <div id="modal-dow-field" class="modal-field" style="display:none">
+          <!-- WEEKLY: day pills (multi-select) -->
+          <div id="modal-weekly-field" class="modal-field" style="display:none">
+            <div class="modal-label">DAY(S) OF WEEK</div>
+            <div class="day-pills">
+              <button type="button" class="day-pill" data-dow="1">MON</button>
+              <button type="button" class="day-pill" data-dow="2">TUE</button>
+              <button type="button" class="day-pill" data-dow="3">WED</button>
+              <button type="button" class="day-pill" data-dow="4">THU</button>
+              <button type="button" class="day-pill" data-dow="5">FRI</button>
+              <button type="button" class="day-pill" data-dow="6">SAT</button>
+              <button type="button" class="day-pill" data-dow="0">SUN</button>
+            </div>
+          </div>
+
+          <!-- BIWEEKLY: single day -->
+          <div id="modal-biweekly-field" class="modal-field" style="display:none">
             <div class="modal-label">DAY OF WEEK</div>
-            <select id="m-dow" class="modal-select">
-              <option value="0">Sunday</option>
+            <select id="m-biweekly-dow" class="modal-select">
               <option value="1">Monday</option>
               <option value="2">Tuesday</option>
               <option value="3">Wednesday</option>
               <option value="4">Thursday</option>
               <option value="5">Friday</option>
               <option value="6">Saturday</option>
+              <option value="0">Sunday</option>
             </select>
           </div>
 
-          <div id="modal-dotm-field" class="modal-field" style="display:none">
-            <div class="modal-label">WHICH SATURDAY</div>
-            <select id="m-dotm" class="modal-select">
-              <option value="monthly-sat">1st Saturday of month</option>
-              <option value="monthly-2nd">2nd Saturday of month</option>
-              <option value="monthly-3rd">3rd Saturday of month</option>
-              <option value="monthly-4th">4th Saturday of month</option>
-            </select>
+          <!-- MONTHLY: mode toggle + sub-fields -->
+          <div id="modal-monthly-field" class="modal-field" style="display:none">
+            <div class="modal-label">MONTHLY PATTERN</div>
+            <div class="mode-pills">
+              <button type="button" class="mode-pill active" id="m-monthly-mode-dotm" onclick="setMonthlyMode('dotm')">DATE</button>
+              <button type="button" class="mode-pill" id="m-monthly-mode-nth" onclick="setMonthlyMode('nth')">NTH WEEKDAY</button>
+            </div>
+            <!-- dotm sub-field -->
+            <div id="m-monthly-dotm-wrap" class="modal-row" style="align-items:center;gap:8px">
+              <div class="modal-label" style="margin:0;white-space:nowrap">DAY OF MONTH</div>
+              <input id="m-dotm-num" class="modal-input num-input" type="number" min="1" max="31" value="1"/>
+            </div>
+            <!-- nth weekday sub-field -->
+            <div id="m-monthly-nth-wrap" style="display:none">
+              <div class="ordinal-row">
+                <select id="m-nth-ord" class="modal-select" style="flex:1">
+                  <option value="1">1st</option>
+                  <option value="2">2nd</option>
+                  <option value="3">3rd</option>
+                  <option value="4">4th</option>
+                </select>
+                <select id="m-nth-dow" class="modal-select" style="flex:1">
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                  <option value="0">Sunday</option>
+                </select>
+              </div>
+            </div>
           </div>
-        </div>
+
+          <!-- YEARLY: month + same sub-fields as monthly -->
+          <div id="modal-yearly-field" class="modal-field" style="display:none">
+            <div class="modal-label">MONTH</div>
+            <select id="m-year-month" class="modal-select" style="margin-bottom:10px">
+              <option value="1">January</option><option value="2">February</option>
+              <option value="3">March</option><option value="4">April</option>
+              <option value="5">May</option><option value="6">June</option>
+              <option value="7">July</option><option value="8">August</option>
+              <option value="9">September</option><option value="10">October</option>
+              <option value="11">November</option><option value="12">December</option>
+            </select>
+            <div class="mode-pills">
+              <button type="button" class="mode-pill active" id="m-yearly-mode-dotm" onclick="setYearlyMode('dotm')">DATE</button>
+              <button type="button" class="mode-pill" id="m-yearly-mode-nth" onclick="setYearlyMode('nth')">NTH WEEKDAY</button>
+            </div>
+            <div id="m-yearly-dotm-wrap" class="modal-row" style="align-items:center;gap:8px">
+              <div class="modal-label" style="margin:0;white-space:nowrap">DAY OF MONTH</div>
+              <input id="m-year-dotm-num" class="modal-input num-input" type="number" min="1" max="31" value="1"/>
+            </div>
+            <div id="m-yearly-nth-wrap" style="display:none">
+              <div class="ordinal-row">
+                <select id="m-year-nth-ord" class="modal-select" style="flex:1">
+                  <option value="1">1st</option><option value="2">2nd</option>
+                  <option value="3">3rd</option><option value="4">4th</option>
+                </select>
+                <select id="m-year-nth-dow" class="modal-select" style="flex:1">
+                  <option value="1">Monday</option><option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option><option value="4">Thursday</option>
+                  <option value="5">Friday</option><option value="6">Saturday</option>
+                  <option value="0">Sunday</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /modal-freq-opts -->
 
         <button id="modal-submit" class="modal-submit" onclick="submitTask()">+ ADD TASK</button>
       </div>
@@ -949,7 +1059,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.10.8 · pre-release</div>
+    <div id="version-tag">v0.10.9 · pre-release</div>
   </div>
   </div>
 
@@ -2578,94 +2688,129 @@ function closeTaskModal() {
 function handleOverlayClick(e) {
   if (e.target === document.getElementById("task-modal-overlay")) closeTaskModal();
 }
+// ── Modal state ──────────────────────────────────────────────────────────────
+let _monthlyMode = 'dotm'; // 'dotm' | 'nth'
+let _yearlyMode  = 'dotm';
+
+function setMonthlyMode(mode) {
+  _monthlyMode = mode;
+  document.getElementById('m-monthly-mode-dotm').classList.toggle('active', mode === 'dotm');
+  document.getElementById('m-monthly-mode-nth').classList.toggle('active',  mode === 'nth');
+  document.getElementById('m-monthly-dotm-wrap').style.display = mode === 'dotm' ? 'flex' : 'none';
+  document.getElementById('m-monthly-nth-wrap').style.display  = mode === 'nth'  ? 'block': 'none';
+}
+function setYearlyMode(mode) {
+  _yearlyMode = mode;
+  document.getElementById('m-yearly-mode-dotm').classList.toggle('active', mode === 'dotm');
+  document.getElementById('m-yearly-mode-nth').classList.toggle('active',  mode === 'nth');
+  document.getElementById('m-yearly-dotm-wrap').style.display = mode === 'dotm' ? 'flex' : 'none';
+  document.getElementById('m-yearly-nth-wrap').style.display  = mode === 'nth'  ? 'block': 'none';
+}
+
 function resetModal() {
-  document.getElementById("m-name").value  = "";
-  document.getElementById("m-emoji").value = "✅";
-  document.getElementById("m-section").value = "home";
-  document.getElementById("m-type").value  = "recurring";
-  document.getElementById("m-freq").value  = "daily";
-  document.getElementById("modal-freq-opts").classList.add("visible");
-  document.getElementById("modal-date-field").style.display = "none";
-  document.getElementById("modal-dow-field").style.display  = "none";
-  document.getElementById("modal-dotm-field").style.display = "none";
-  document.getElementById("m-targetdate").value = "";
-  const btn = document.getElementById("modal-submit");
-  btn.textContent = "+ ADD TASK";
-  btn.disabled = false;
-  btn.className = "modal-submit";
+  document.getElementById('m-name').value    = '';
+  document.getElementById('m-emoji').value   = '✅';
+  document.getElementById('m-section').value = 'home';
+  document.getElementById('m-type').value    = 'recurring';
+  document.getElementById('m-freq').value    = 'daily';
+  document.getElementById('modal-date-field').style.display = 'none';
+  document.getElementById('m-targetdate').value = '';
+  // Hide all freq sub-fields
+  ['modal-weekly-field','modal-biweekly-field',
+   'modal-monthly-field','modal-yearly-field'].forEach(id =>
+    document.getElementById(id).style.display = 'none');
+  // Reset day pills
+  document.querySelectorAll('.day-pill').forEach(p => p.classList.remove('active'));
+  // Reset monthly/yearly modes
+  setMonthlyMode('dotm'); setYearlyMode('dotm');
+  document.getElementById('m-dotm-num').value      = '1';
+  document.getElementById('m-year-dotm-num').value = '1';
+  const btn = document.getElementById('modal-submit');
+  btn.textContent = '+ ADD TASK'; btn.disabled = false; btn.className = 'modal-submit';
 }
+
 function onModalTypeChange() {
-  const isOnce = document.getElementById("m-type").value === "once";
-  document.getElementById("modal-freq-opts").classList.toggle("visible", !isOnce);
-  document.getElementById("modal-date-field").style.display = isOnce ? "block" : "none";
-  if (isOnce) {
-    // Default to today
-    document.getElementById("m-targetdate").value = todayKey;
-  }
+  const isOnce = document.getElementById('m-type').value === 'once';
+  document.getElementById('modal-freq-opts').style.display = isOnce ? 'none' : 'block';
+  document.getElementById('modal-date-field').style.display = isOnce ? 'block' : 'none';
+  if (isOnce) document.getElementById('m-targetdate').value = todayKey;
 }
+
 function onModalFreqChange() {
-  const freq = document.getElementById("m-freq").value;
-  document.getElementById("modal-dow-field").style.display  = freq === "weekly"      ? "block" : "none";
-  document.getElementById("modal-dotm-field").style.display = freq === "monthly-sat" ? "block" : "none";
+  const freq = document.getElementById('m-freq').value;
+  document.getElementById('modal-weekly-field').style.display   = freq === 'weekly'   ? 'block' : 'none';
+  document.getElementById('modal-biweekly-field').style.display = freq === 'biweekly' ? 'block' : 'none';
+  document.getElementById('modal-monthly-field').style.display  = freq === 'monthly'  ? 'block' : 'none';
+  document.getElementById('modal-yearly-field').style.display   = freq === 'yearly'   ? 'block' : 'none';
 }
+
+// Wire day pill toggles
+document.querySelectorAll('.day-pill').forEach(pill => {
+  pill.addEventListener('click', () => pill.classList.toggle('active'));
+});
 
 async function submitTask() {
-  const name = document.getElementById("m-name").value.trim();
-  if (!name) { document.getElementById("m-name").focus(); return; }
+  const name = document.getElementById('m-name').value.trim();
+  if (!name) { document.getElementById('m-name').focus(); return; }
 
-  const type   = document.getElementById("m-type").value;
-  const isOnce = type === "once";
-  const freq   = isOnce ? "once" : document.getElementById("m-freq").value;
-
-  // Resolve actual freq value for monthly
-  let resolvedFreq = freq;
-  if (freq === "monthly-sat") {
-    resolvedFreq = document.getElementById("m-dotm").value;
-  }
+  const type   = document.getElementById('m-type').value;
+  const isOnce = type === 'once';
+  const freq   = isOnce ? 'once' : document.getElementById('m-freq').value;
 
   const task = {
     name,
-    emoji:      document.getElementById("m-emoji").value || "✅",
-    section:    document.getElementById("m-section").value,
-    freq:       resolvedFreq,
-    type:       type,
-    notes:      "",
-    targetDate: isOnce ? (document.getElementById("m-targetdate").value || "") : "",
+    emoji:      document.getElementById('m-emoji').value || '✅',
+    section:    document.getElementById('m-section').value,
+    freq,
+    type,
+    notes:      '',
+    targetDate: isOnce ? (document.getElementById('m-targetdate').value || '') : '',
   };
-  if (!isOnce && resolvedFreq === "weekly") {
-    task.dow = parseInt(document.getElementById("m-dow").value);
+
+  if (!isOnce) {
+    if (freq === 'weekly') {
+      const active = [...document.querySelectorAll('.day-pill.active')].map(p => parseInt(p.dataset.dow));
+      if (active.length === 0) { alert('Please select at least one day.'); return; }
+      task.dow = active.length === 1 ? active[0] : active.join(',');
+    }
+    if (freq === 'biweekly') {
+      task.dow = parseInt(document.getElementById('m-biweekly-dow').value);
+    }
+    if (freq === 'monthly') {
+      if (_monthlyMode === 'dotm') {
+        task.dotm = parseInt(document.getElementById('m-dotm-num').value) || 1;
+      } else {
+        task.dotwOrd = parseInt(document.getElementById('m-nth-ord').value);
+        task.dow     = parseInt(document.getElementById('m-nth-dow').value);
+      }
+    }
+    if (freq === 'yearly') {
+      task.yearMonth = parseInt(document.getElementById('m-year-month').value);
+      if (_yearlyMode === 'dotm') {
+        task.dotm = parseInt(document.getElementById('m-year-dotm-num').value) || 1;
+      } else {
+        task.dotwOrd = parseInt(document.getElementById('m-year-nth-ord').value);
+        task.dow     = parseInt(document.getElementById('m-year-nth-dow').value);
+      }
+    }
   }
 
-  // Update button state
-  const btn = document.getElementById("modal-submit");
-  btn.textContent = "SAVING…";
-  btn.disabled = true;
-  btn.className = "modal-submit saving";
+  const btn = document.getElementById('modal-submit');
+  btn.textContent = 'SAVING…'; btn.disabled = true; btn.className = 'modal-submit saving';
 
   try {
     const res  = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ action: "addTask", task })
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'addTask', task })
     });
     const data = await res.json();
-    if (!data.ok) throw new Error(data.error || "Failed");
-
-    btn.textContent = "✓ ADDED";
-    btn.className = "modal-submit saved";
-
-    // Close modal after brief confirmation
-    setTimeout(() => {
-      closeTaskModal();
-      // Re-sync sheet so new task appears
-      syncFromSheet();
-    }, 900);
-
+    if (!data.ok) throw new Error(data.error || 'Failed');
+    btn.textContent = '✓ ADDED'; btn.className = 'modal-submit saved';
+    setTimeout(() => { closeTaskModal(); syncFromSheet(); }, 900);
   } catch(err) {
-    btn.textContent = "RETRY";
-    btn.disabled = false;
-    btn.className = "modal-submit";
-    console.warn("Add task failed:", err);
+    btn.textContent = 'RETRY'; btn.disabled = false; btn.className = 'modal-submit';
+    console.warn('Add task failed:', err);
   }
 }
 
