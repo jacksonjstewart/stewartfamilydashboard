@@ -351,9 +351,15 @@
     color: #222; user-select: none; line-height: 1;
   }
   #checkin-indicator .checkin-prefix { color: #222; }
-  #checkin-indicator .checkin-name   { transition: color 0.4s; }
-  #checkin-indicator .checkin-name.jackson { color: rgba(74,222,128,0.6); }
-  #checkin-indicator .checkin-name.katelyn { color: rgba(168,85,247,0.6); }
+  #checkin-indicator .checkin-name {
+    transition: color 0.25s, opacity 0.25s;
+    cursor: pointer;
+  }
+  #checkin-indicator .checkin-name:hover { opacity: 1 !important; filter: brightness(1.5); }
+  #checkin-indicator .checkin-name.jackson { color: rgba(74,222,128,0.55); }
+  #checkin-indicator .checkin-name.katelyn { color: rgba(168,85,247,0.55); }
+  #checkin-indicator .checkin-name.family  { color: #2e2e2e; }
+  #checkin-indicator .checkin-name.family:hover { color: #444 !important; filter: none; }
   #version-tag {
     font-size: 9px; color: #1e1e1e;
     letter-spacing: 1.5px; font-family: 'Outfit', sans-serif;
@@ -943,7 +949,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.10.6 · pre-release</div>
+    <div id="version-tag">v0.10.7 · pre-release</div>
   </div>
   </div>
 
@@ -1463,12 +1469,14 @@ function setIdentity(name, btn) {
 function updateCheckinIndicator(name) {
   const el = document.getElementById('checkin-indicator');
   if (!el) return;
-  if (!name || name === 'The Stewart Family') {
-    el.innerHTML = '';
-  } else {
-    const cls = name === 'Katelyn' ? 'katelyn' : 'jackson';
-    el.innerHTML = `<span class="checkin-prefix">checked in as </span><span class="checkin-name ${cls}">${name}</span>`;
-  }
+  const isFamily = !name || name === 'The Stewart Family';
+  const cls      = name === 'Katelyn' ? 'katelyn' : name === 'Jackson' ? 'jackson' : 'family';
+  const display  = isFamily ? 'The Stewart Family' : name;
+  el.innerHTML = `<span class="checkin-prefix">checked in as </span><span class="checkin-name ${cls}" onclick="showIdentityModal()" title="Tap to switch">${display}</span>`;
+}
+
+function showIdentityModal() {
+  document.getElementById('identity-modal-overlay').classList.add('open');
 }
 
 function setIdentityModal(name) {
@@ -1496,6 +1504,7 @@ function restoreIdentityUI() {
     // No valid session — show prompt modal after brief load delay
     currentIdentity = 'The Stewart Family';
     if (bar) bar.style.display = 'flex';
+    updateCheckinIndicator('The Stewart Family');
     setTimeout(() => {
       document.getElementById('identity-modal-overlay').classList.add('open');
     }, 800);
