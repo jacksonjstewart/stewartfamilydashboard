@@ -809,7 +809,7 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="version-tag">v0.9.3 · pre-release</div>
+  <div id="version-tag">v0.9.4 · pre-release</div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -1228,10 +1228,11 @@ async function syncTodayState() {
     });
 
     // REMOVE: entries in local doneLog for today that are no longer in sheet
+    // Skip any taskId currently being written (race condition protection)
     Object.keys(doneLog).forEach(key => {
       if (!key.endsWith("_" + todayKey)) return;
       const taskId = key.replace("_" + todayKey, "");
-      if (!sheetChecked.has(taskId)) {
+      if (!sheetChecked.has(taskId) && !_pendingWrites.has(taskId)) {
         delete doneLog[key];
         changed = true;
       }
@@ -1242,7 +1243,11 @@ async function syncTodayState() {
 }
 
 // Write a single check to the Today sheet
+// Tracks taskIds currently being written — prevents sync from nuking in-flight checks
+const _pendingWrites = new Set();
+
 async function writeCheckToSheet(taskId, completedAt) {
+  _pendingWrites.add(taskId);
   try {
     await fetch(API_URL, {
       method: "POST",
@@ -1250,10 +1255,12 @@ async function writeCheckToSheet(taskId, completedAt) {
       body: JSON.stringify({ action: "checkTask", taskId, dateKey: todayKey, completedAt })
     });
   } catch(err) { console.warn("checkTask write failed:", err); }
+  finally { _pendingWrites.delete(taskId); }
 }
 
 // Remove a check from the Today sheet
 async function writeUncheckToSheet(taskId) {
+  _pendingWrites.add(taskId);
   try {
     await fetch(API_URL, {
       method: "POST",
@@ -1261,6 +1268,7 @@ async function writeUncheckToSheet(taskId) {
       body: JSON.stringify({ action: "uncheckTask", taskId, dateKey: todayKey })
     });
   } catch(err) { console.warn("uncheckTask write failed:", err); }
+  finally { _pendingWrites.delete(taskId); }
 }
 function loadPushFwd() { try { return JSON.parse(localStorage.getItem("hd_pushfwd") || "[]"); } catch { return []; } }
 function savePushFwd(p){ localStorage.setItem("hd_pushfwd", JSON.stringify(p)); }
@@ -1574,7 +1582,7 @@ function render() {
   } else {
     emptyEl.style.display = "none";
 
-    // ── 1. ONE TIME ONLY ──────────────────────────────────────────────────────
+    // ── 1. ONE TIME ONLY — always above recurring; incomplete first, complete last ──
     const allOnceTasks = todayTasks.filter(t => t.type === 'once');
     if (allOnceTasks.length > 0) {
       const allOnceDone = allOnceTasks.every(t => !!doneLog[t.id + "_" + todayKey]);
@@ -1582,41 +1590,61 @@ function render() {
       oHdr.className = "type-header once-header" + (allOnceDone ? " once-all-done" : "");
       oHdr.textContent = "ONE TIME ONLY";
       listEl.appendChild(oHdr);
-      allOnceTasks.forEach(task => {
-          const isDone    = !!doneLog[task.id + "_" + todayKey];
-          const isCustom  = customTasks.some(c => c.id === task.id);
-          const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey]) : null;
-          const permEntry = permanentHistory[task.id];
-          const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
-            ? "Last completed " + formatStamp(permEntry.completedAt) : null;
-          listEl.appendChild(buildTaskRow(task, true, isDone, isCustom, tempStamp || permStamp, false));
-        });
+      const sortedOnce = [...allOnceTasks].sort((a,b) => {
+        const ad = !!doneLog[a.id+"_"+todayKey], bd = !!doneLog[b.id+"_"+todayKey];
+        return ad - bd; // incomplete (false=0) before complete (true=1)
+      });
+      sortedOnce.forEach(task => {
+        const isDone    = !!doneLog[task.id + "_" + todayKey];
+        const isCustom  = customTasks.some(c => c.id === task.id);
+        const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey]) : null;
+        const permEntry = permanentHistory[task.id];
+        const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
+          ? "Last completed " + formatStamp(permEntry.completedAt) : null;
+        listEl.appendChild(buildTaskRow(task, true, isDone, isCustom, tempStamp || permStamp, false));
+      });
     }
 
-    // ── 2. RECURRING ─────────────────────────────────────────────────────────
-    const anyRecurring = todayTasks.some(t => t.type !== 'once');
-    if (anyRecurring) {
+    // ── 2. RECURRING — sections with incomplete tasks first, fully-done sections last ──
+    const recurringTasks = todayTasks.filter(t => t.type !== 'once');
+    if (recurringTasks.length > 0) {
       const rHdr = document.createElement("div");
       rHdr.className = "type-header";
       rHdr.textContent = "RECURRING";
       listEl.appendChild(rHdr);
-      SECTIONS.forEach(sec => {
-        const secTasks = todayTasks.filter(t => t.section === sec.key && t.type !== 'once');
+
+      // Sort sections: any incomplete tasks → top; all complete → bottom
+      const sortedSections = [...SECTIONS].sort((a, b) => {
+        const aTasks    = recurringTasks.filter(t => t.section === a.key);
+        const bTasks    = recurringTasks.filter(t => t.section === b.key);
+        const aAllDone  = aTasks.length > 0 && aTasks.every(t => !!doneLog[t.id+"_"+todayKey]);
+        const bAllDone  = bTasks.length > 0 && bTasks.every(t => !!doneLog[t.id+"_"+todayKey]);
+        if (aAllDone === bAllDone) return 0; // preserve original section order within groups
+        return aAllDone ? 1 : -1; // incomplete sections float up
+      });
+
+      sortedSections.forEach(sec => {
+        const secTasks = recurringTasks.filter(t => t.section === sec.key);
         if (!secTasks.length) return;
         const secDone = secTasks.filter(t => doneLog[t.id + "_" + todayKey]).length;
         const hdr = document.createElement("div");
         hdr.className = "section-header";
         hdr.innerHTML = `<div class="section-pip" style="background:${sec.accent}"></div><span class="section-label">${sec.label.toUpperCase()}</span><span class="section-count">${secDone}/${secTasks.length}</span>`;
         listEl.appendChild(hdr);
-        secTasks.forEach(task => {
-            const isDone    = !!doneLog[task.id + "_" + todayKey];
-            const isCustom  = customTasks.some(c => c.id === task.id);
-            const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey]) : null;
-            const permEntry = permanentHistory[task.id];
-            const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
-              ? "Last completed " + formatStamp(permEntry.completedAt) : null;
-            listEl.appendChild(buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false));
-          });
+        // Within section: incomplete first, complete last
+        const sortedSec = [...secTasks].sort((a,b) => {
+          const ad = !!doneLog[a.id+"_"+todayKey], bd = !!doneLog[b.id+"_"+todayKey];
+          return ad - bd;
+        });
+        sortedSec.forEach(task => {
+          const isDone    = !!doneLog[task.id + "_" + todayKey];
+          const isCustom  = customTasks.some(c => c.id === task.id);
+          const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey]) : null;
+          const permEntry = permanentHistory[task.id];
+          const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
+            ? "Last completed " + formatStamp(permEntry.completedAt) : null;
+          listEl.appendChild(buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false));
+        });
       });
     }
   }
