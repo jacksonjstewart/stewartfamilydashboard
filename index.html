@@ -469,7 +469,7 @@
   .week-no-tasks { font-size: 13px; color: #2a2a2a; font-style: italic; }
 
   /* ── HISTORY VIEW ── */
-  #history-range { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
+  #history-range { display: flex; gap: 10px; margin-bottom: 32px; flex-wrap: wrap; }
   .range-btn {
     background: none; border: 1px solid #1e1e1e; color: #333;
     border-radius: 8px; padding: 5px 12px; cursor: pointer;
@@ -481,32 +481,112 @@
 
   .history-empty { font-size: 13px; color: #2a2a2a; font-style: italic; margin-top: 8px; }
 
-  .stat-card {
-    background: #0e0e0e; border: 1px solid #161616; border-radius: 14px;
-    padding: 20px 22px; margin-bottom: 12px;
+  /* ── ALL-TIME COUNTER ── */
+  #alltime-counter {
+    margin-bottom: 36px; padding-bottom: 28px;
+    border-bottom: 1px solid #111;
   }
-  .stat-card-title { font-size: 9px; color: #333; letter-spacing: 2.5px; font-weight: 600; margin-bottom: 14px; }
+  #alltime-label {
+    font-size: 9px; color: #333; letter-spacing: 3px; font-weight: 600;
+    margin-bottom: 6px; font-family: 'Outfit', sans-serif;
+  }
+  #alltime-number {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 80px; font-weight: 300; color: #ffffff;
+    line-height: 0.9; letter-spacing: -3px;
+  }
+  #alltime-sub {
+    font-size: 11px; color: #333; margin-top: 10px; letter-spacing: 0.5px;
+  }
+
+  /* ── HEATMAP ── */
+  #heatmap-wrap { margin-bottom: 36px; }
+  #heatmap-label {
+    font-size: 9px; color: #333; letter-spacing: 3px; font-weight: 600;
+    margin-bottom: 14px; font-family: 'Outfit', sans-serif;
+  }
+  #heatmap {
+    display: flex; gap: 3px; flex-wrap: wrap;
+  }
+  .heatmap-col { display: flex; flex-direction: column; gap: 3px; }
+  .heatmap-cell {
+    width: 11px; height: 11px; border-radius: 2px;
+    background: #111; transition: background 0.2s;
+    cursor: default;
+  }
+  .heatmap-cell.h1 { background: rgba(74,222,128,0.15); }
+  .heatmap-cell.h2 { background: rgba(74,222,128,0.35); }
+  .heatmap-cell.h3 { background: rgba(74,222,128,0.6); }
+  .heatmap-cell.h4 { background: rgba(74,222,128,0.85); }
+  .heatmap-month-labels {
+    display: flex; gap: 3px; margin-bottom: 4px; flex-wrap: wrap;
+  }
+  .heatmap-month-lbl {
+    font-size: 8px; color: #333; letter-spacing: 1px;
+    font-family: 'Outfit', sans-serif; width: 11px; text-align: center;
+    overflow: visible; white-space: nowrap;
+  }
+
+  /* ── STAT CARDS ── */
+  .stat-card {
+    background: #0e0e0e; border: 1px solid #111; border-radius: 14px;
+    padding: 20px 22px; margin-bottom: 10px;
+  }
+  .stat-card-title { font-size: 9px; color: #2a2a2a; letter-spacing: 2.5px; font-weight: 600; margin-bottom: 10px; }
   .stat-card-big {
     font-family: 'Cormorant Garamond', serif; font-size: 52px;
     font-weight: 300; color: #ffffff; line-height: 1; letter-spacing: -2px;
   }
-  .stat-card-sub { font-size: 11px; color: #444; margin-top: 4px; }
+  .stat-card-sub { font-size: 11px; color: #333; margin-top: 4px; }
 
-  .streak-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  /* ── STREAK BOXES ── */
+  .streak-row { display: flex; gap: 10px; margin-bottom: 10px; }
   .streak-box {
-    flex: 1; background: #0e0e0e; border: 1px solid #161616; border-radius: 14px;
+    flex: 1; background: #0e0e0e; border: 1px solid #111; border-radius: 14px;
     padding: 18px 16px; text-align: center;
   }
   .streak-val { font-family: 'Cormorant Garamond', serif; font-size: 42px; font-weight: 300; color: #ffffff; line-height: 1; }
-  .streak-lbl { font-size: 9px; color: #333; letter-spacing: 2px; margin-top: 5px; }
+  .streak-lbl { font-size: 9px; color: #2a2a2a; letter-spacing: 2px; margin-top: 5px; }
+  .streak-box.lit .streak-val { color: #4ade80; }
+  .streak-box.lit { border-color: rgba(74,222,128,0.15); }
 
-  .history-bar-section { margin-bottom: 20px; }
-  .history-bar-row { margin-bottom: 10px; }
-  .history-bar-meta { display: flex; justify-content: space-between; margin-bottom: 4px; }
-  .history-bar-name { font-size: 10px; color: #555; letter-spacing: 1.5px; }
-  .history-bar-val { font-size: 10px; color: #444; }
-  .history-bar-track { height: 3px; background: #1a1a1a; border-radius: 99px; }
-  .history-bar-fill { height: 100%; border-radius: 99px; opacity: 0.7; }
+  /* ── SECTION BREAKDOWN ── */
+  .history-bar-section { margin-bottom: 28px; }
+  .history-bar-row { margin-bottom: 12px; }
+  .history-bar-meta { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .history-bar-name { font-size: 10px; color: #444; letter-spacing: 1.5px; }
+  .history-bar-val { font-size: 10px; color: #333; }
+  .history-bar-track { height: 2px; background: #111; border-radius: 99px; }
+  .history-bar-fill { height: 100%; border-radius: 99px; transition: width 1s cubic-bezier(0.4,0,0.2,1); }
+
+  /* ── TOP TASKS ── */
+  .top-task-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid #0f0f0f;
+  }
+  .top-task-row:last-child { border-bottom: none; }
+  .top-task-rank {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px; font-weight: 300; color: #222;
+    width: 24px; text-align: right; flex-shrink: 0;
+  }
+  .top-task-emoji { font-size: 14px; flex-shrink: 0; }
+  .top-task-name { font-size: 13px; color: #888; flex: 1; }
+  .top-task-count { font-size: 11px; color: #333; flex-shrink: 0; }
+
+  /* ── MILESTONES ── */
+  .milestone-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid #0f0f0f;
+  }
+  .milestone-row:last-child { border-bottom: none; }
+  .milestone-icon { font-size: 18px; flex-shrink: 0; opacity: 0.9; }
+  .milestone-text { flex: 1; }
+  .milestone-name { font-size: 13px; color: #888; }
+  .milestone-date { font-size: 10px; color: #333; margin-top: 2px; letter-spacing: 0.5px; }
+  .milestone-row.locked .milestone-icon { opacity: 0.15; filter: grayscale(1); }
+  .milestone-row.locked .milestone-name { color: #2a2a2a; }
+  .milestone-row.locked .milestone-date { color: #1e1e1e; }
 
   /* ── RIGHT COLUMN ── */
   #ring-wrap {
@@ -729,7 +809,7 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="version-tag">v0.9.1 · pre-release</div>
+  <div id="version-tag">v0.9.2 · pre-release</div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -1643,205 +1723,250 @@ function renderHistory() {
   const el = document.getElementById("history-content");
   el.innerHTML = "";
 
-  const cutoff = new Date();
+  const allTimeDone = rawHistory.length;
+  const allTimeDays = new Set(rawHistory.map(e => e.dateKey)).size;
+
+  const cutoff  = new Date();
   cutoff.setDate(cutoff.getDate() - historyRangeDays);
   const filtered = historyRangeDays >= 99999
     ? rawHistory
     : rawHistory.filter(e => new Date(e.completedAt) >= cutoff);
 
+  // ── ALL-TIME COUNTER ─────────────────────────────────────────────────────
+  const firstDate = rawHistory.length > 0
+    ? rawHistory.reduce((a,b) => a.dateKey < b.dateKey ? a : b).dateKey
+    : null;
+  const counterEl = document.createElement("div");
+  counterEl.id = "alltime-counter";
+  counterEl.innerHTML = `
+    <div id="alltime-label">TASKS COMPLETED · ALL TIME</div>
+    <div id="alltime-number">${allTimeDone.toLocaleString()}</div>
+    <div id="alltime-sub">${allTimeDays} active day${allTimeDays !== 1 ? 's' : ''} · tracking since ${firstDate ? MONTHS[new Date(firstDate+'T00:00:00').getMonth()].slice(0,3) + ' ' + new Date(firstDate+'T00:00:00').getDate() + ', ' + new Date(firstDate+'T00:00:00').getFullYear() : '—'}</div>`;
+  el.appendChild(counterEl);
+
+  // ── CONTRIBUTION HEATMAP ─────────────────────────────────────────────────
+  const dayCounts = {};
+  rawHistory.forEach(e => { dayCounts[e.dateKey] = (dayCounts[e.dateKey] || 0) + 1; });
+  Object.keys(doneLog).forEach(k => {
+    if (k.endsWith("_" + todayKey)) dayCounts[todayKey] = (dayCounts[todayKey] || 0) + 1;
+  });
+  const maxCount  = Math.max(...Object.values(dayCounts), 1);
+  const heatStart = addDays(today, -182);
+  const gridStart = addDays(heatStart, -heatStart.getDay());
+
+  const cols = [];
+  let d = new Date(gridStart);
+  while (d <= today) {
+    const col = [];
+    for (let row = 0; row < 7; row++) {
+      const dk    = dateKey(d);
+      const count = dayCounts[dk] || 0;
+      const isFuture = d > today;
+      let heat = 0;
+      if (!isFuture && count > 0) {
+        const ratio = count / maxCount;
+        heat = ratio < 0.25 ? 1 : ratio < 0.5 ? 2 : ratio < 0.75 ? 3 : 4;
+      }
+      col.push({ dk, count, isFuture, heat });
+      d = addDays(d, 1);
+    }
+    cols.push(col);
+  }
+  const monthLabelHTML = cols.map(col => {
+    const fd = new Date(col[0].dk + "T00:00:00");
+    return `<div class="heatmap-month-lbl">${fd.getDate() <= 7 ? MONTHS[fd.getMonth()].slice(0,3) : ''}</div>`;
+  }).join('');
+  const colsHTML = cols.map(col =>
+    `<div class="heatmap-col">${col.map(cell =>
+      `<div class="heatmap-cell${cell.isFuture ? '' : ' h'+cell.heat}" title="${cell.dk}${cell.count ? ': '+cell.count+' task'+(cell.count!==1?'s':'') : ''}"></div>`
+    ).join('')}</div>`
+  ).join('');
+
+  const heatmapWrap = document.createElement("div");
+  heatmapWrap.id = "heatmap-wrap";
+  heatmapWrap.innerHTML = `
+    <div id="heatmap-label">ACTIVITY · LAST 26 WEEKS</div>
+    <div class="heatmap-month-labels">${monthLabelHTML}</div>
+    <div id="heatmap">${colsHTML}</div>`;
+  el.appendChild(heatmapWrap);
+
   if (filtered.length === 0) {
-    el.innerHTML = '<div class="history-empty">No data yet for this period. Tasks you complete will appear here after midnight commit.</div>';
-    // Right column placeholder
-    document.getElementById("ring-fill").style.strokeDashoffset = CIRC;
-    document.getElementById("ring-fill").style.stroke = "#4ade80";
-    document.getElementById("ring-pct").innerHTML = '0<span>%</span>';
-    document.getElementById("ring-label").textContent = "COMPLETION";
-    document.getElementById("motivate-msg").textContent = "Just getting started.";
-    document.getElementById("motivate-msg").style.color = "#555";
-    document.getElementById("motivate-sub").textContent = "History builds over time";
+    el.insertAdjacentHTML("beforeend", '<div class="history-empty" style="margin-top:8px">No completions yet in this period. Check back after tonight\'s commit.</div>');
+    updateHistoryRightColumn(0, 0, 0, "0");
     return;
   }
 
-  // Stats
-  const uniqueDays   = new Set(filtered.map(e => e.dateKey)).size;
-  const totalDone    = filtered.length;
-  const avgPerDay    = uniqueDays > 0 ? (totalDone / uniqueDays).toFixed(1) : 0;
-
-  // Streak: consecutive days with at least one completion ending today
-  const allDays = [...new Set(rawHistory.map(e => e.dateKey))].sort();
-  let streak = 0;
-  const check = new Date(today);
+  // ── STREAKS ──────────────────────────────────────────────────────────────
+  let streak = 0, longestStreak = 0, tempStreak = 0;
+  const checkD = new Date(today);
   while (true) {
-    const k = dateKey(check);
-    const hasEntry = rawHistory.some(e => e.dateKey === k) || (k === todayKey && Object.keys(doneLog).some(k2 => k2.endsWith('_' + todayKey)));
-    if (hasEntry) { streak++; check.setDate(check.getDate() - 1); }
+    const k   = dateKey(checkD);
+    const has = (dayCounts[k] || 0) > 0;
+    if (has) { streak++; checkD.setDate(checkD.getDate() - 1); }
     else break;
   }
-
-  // Overall completion rate (approximate: done vs total tasks per day)
-  const allTasks = [...sheetTasks, ...customTasks].filter(t => t.type !== 'once' && t.freq !== 'once');
-  const sampleDate = new Date(today); sampleDate.setDate(1);
-  const sampledTotal = allTasks.filter(t => isDueOn(t, sampleDate)).length || 1;
-  const completionRate = Math.min(100, Math.round((totalDone / (uniqueDays * sampledTotal)) * 100));
-
-  // Right column
-  const rc = completionRate >= 80 ? "#4ade80" : completionRate >= 50 ? "#facc15" : "#f87171";
-  document.getElementById("ring-fill").style.strokeDashoffset = CIRC * (1 - completionRate/100);
-  document.getElementById("ring-fill").style.stroke = rc;
-  document.getElementById("ring-pct").innerHTML = completionRate + '<span>%</span>';
-  document.getElementById("ring-label").textContent = "COMPLETION";
-  document.getElementById("motivate-msg").textContent = streak >= 7 ? "Great streak." : streak >= 3 ? "Building momentum." : "Keep going.";
-  document.getElementById("motivate-msg").style.color = rc;
-  document.getElementById("motivate-sub").textContent = streak + " day streak";
-  document.getElementById("stat-done").textContent  = totalDone;
-  document.getElementById("stat-total").textContent = uniqueDays;
-  document.getElementById("stat-left").textContent  = streak;
-  document.getElementById("stat-done").parentElement.querySelector(".stat-lbl").textContent  = "COMPLETED";
-  document.getElementById("stat-total").parentElement.querySelector(".stat-lbl").textContent = "ACTIVE DAYS";
-  document.getElementById("stat-left").parentElement.querySelector(".stat-lbl").textContent  = "STREAK";
-  document.getElementById("stat-done").style.color  = "#4ade80";
-  document.getElementById("stat-total").style.color = "#e8e8e8";
-  document.getElementById("stat-left").style.color  = "#facc15";
-
-  // Section breakdown bars
-  const barsEl = document.getElementById("sec-bars");
-  barsEl.innerHTML = "";
-  const maxSec = Math.max(...SECTIONS.map(s => filtered.filter(e => {
-    const task = [...sheetTasks, ...customTasks].find(t => t.id === e.taskId);
-    return task && task.section === s.key;
-  }).length), 1);
-  SECTIONS.forEach(sec => {
-    const count = filtered.filter(e => {
-      const task = [...sheetTasks, ...customTasks].find(t => t.id === e.taskId);
-      return task && task.section === sec.key;
-    }).length;
-    if (!count) return;
-    const bar = document.createElement("div");
-    bar.className = "bar-row";
-    bar.innerHTML = `<div class="bar-meta"><span class="bar-name">${sec.label.toUpperCase()}</span><span class="bar-count">${count}</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(count/maxSec*100)}%;background:${sec.accent}"></div></div>`;
-    barsEl.appendChild(bar);
+  const allDaysSorted = [...new Set(rawHistory.map(e => e.dateKey))].sort();
+  let prev = null;
+  allDaysSorted.forEach(dk => {
+    tempStreak = prev && Math.round((new Date(dk+'T00:00:00') - new Date(prev+'T00:00:00')) / 864e5) === 1
+      ? tempStreak + 1 : 1;
+    longestStreak = Math.max(longestStreak, tempStreak);
+    prev = dk;
   });
+  longestStreak = Math.max(longestStreak, streak);
 
-  // Cards
-  el.innerHTML = `
-    <div class="streak-row">
-      <div class="streak-box"><div class="streak-val" style="color:#facc15">${streak}</div><div class="streak-lbl">DAY STREAK</div></div>
-      <div class="streak-box"><div class="streak-val" style="color:#4ade80">${totalDone}</div><div class="streak-lbl">TASKS DONE</div></div>
-      <div class="streak-box"><div class="streak-val" style="color:#e8e8e8">${avgPerDay}</div><div class="streak-lbl">AVG / DAY</div></div>
+  const uniqueDays  = new Set(filtered.map(e => e.dateKey)).size;
+  const totalDone   = filtered.length;
+  const avgPerDay   = uniqueDays > 0 ? (totalDone / uniqueDays).toFixed(1) : "0";
+  const rangeLabel  = historyRangeDays >= 99999 ? "all time" : "last " + historyRangeDays + " days";
+
+  // ── STREAK BOXES ─────────────────────────────────────────────────────────
+  const streakRow = document.createElement("div");
+  streakRow.className = "streak-row";
+  streakRow.innerHTML = `
+    <div class="streak-box ${streak >= 3 ? 'lit' : ''}">
+      <div class="streak-val">${streak}</div>
+      <div class="streak-lbl">CURRENT STREAK</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-card-title">COMPLETION RATE</div>
-      <div class="stat-card-big" style="color:${rc}">${completionRate}%</div>
-      <div class="stat-card-sub">Across ${uniqueDays} active day${uniqueDays !== 1 ? 's' : ''}</div>
+    <div class="streak-box ${longestStreak >= 7 ? 'lit' : ''}">
+      <div class="streak-val">${longestStreak}</div>
+      <div class="streak-lbl">BEST STREAK</div>
     </div>`;
+  el.appendChild(streakRow);
 
-  // Top completed tasks
-  const taskCounts = {};
-  filtered.forEach(e => { taskCounts[e.taskId] = (taskCounts[e.taskId] || 0) + 1; });
-  const topTasks = Object.entries(taskCounts)
-    .sort((a,b) => b[1]-a[1]).slice(0,5)
-    .map(([id, count]) => {
-      const task = [...sheetTasks, ...customTasks].find(t => t.id === id);
-      return task ? { task, count } : null;
-    }).filter(Boolean);
+  const statsRow = document.createElement("div");
+  statsRow.className = "streak-row";
+  statsRow.innerHTML = `
+    <div class="streak-box">
+      <div class="streak-val">${totalDone}</div>
+      <div class="streak-lbl">IN PERIOD</div>
+    </div>
+    <div class="streak-box">
+      <div class="streak-val">${avgPerDay}</div>
+      <div class="streak-lbl">AVG / DAY</div>
+    </div>`;
+  el.appendChild(statsRow);
 
-  if (topTasks.length > 0) {
-    const card = document.createElement("div");
-    card.className = "stat-card";
-    card.innerHTML = `<div class="stat-card-title">MOST COMPLETED</div>`;
-    topTasks.forEach(({ task, count }) => {
-      const sec = SECTIONS.find(s => s.key === task.section);
-      card.innerHTML += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <span style="font-size:15px">${task.emoji}</span>
-        <span style="font-size:13px;color:#888;flex:1">${task.name}</span>
-        <span style="font-size:11px;color:${sec?.accent||'#555'}">${count}×</span>
-      </div>`;
-    });
-    el.appendChild(card);
-  }
-}
-
-// ─── RIGHT COLUMN (TODAY) ─────────────────────────────────────────────────────
-function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key) {
-  const offset = CIRC * (1 - pct / 100);
-  const rc = pct===100?"#4ade80":pct>=70?"#a3e635":pct>=40?"#facc15":"#f87171";
-  const ringFill = document.getElementById("ring-fill");
-  const ringPct  = document.getElementById("ring-pct");
-  const wasFull  = ringFill.dataset.wasFull === "1";
-  ringFill.style.strokeDashoffset = offset;
-  ringFill.style.stroke = rc;
-  ringPct.innerHTML = pct + '<span>%</span>';
-  document.getElementById("ring-label").textContent = "COMPLETE";
-  if (pct === 100 && !wasFull) {
-    ringFill.dataset.wasFull = "1";
-    const svg = document.querySelector("#ring-wrap svg");
-    svg.classList.remove("pulse");
-    void svg.offsetWidth;
-    svg.classList.add("pulse");
-    svg.addEventListener("animationend", () => svg.classList.remove("pulse"), { once: true });
-  } else if (pct < 100) {
-    ringFill.dataset.wasFull = "";
-  }
-
-  let msg, sub, color;
-  if      (pct===100) { msg="All done.";        sub="Enjoy your day ✓";                                       color="#4ade80"; }
-  else if (pct>=80)   { msg="Almost there.";    sub=remaining+" left to go";                                  color="#a3e635"; }
-  else if (pct>=50)   { msg="Halfway through."; sub=remaining+" item"+(remaining!==1?"s":"")+" remaining";    color="#facc15"; }
-  else if (pct>=25)   { msg="Getting going.";   sub=remaining+" task"+(remaining!==1?"s":"")+" ahead";        color="#fb923c"; }
-  else                { msg="Fresh start.";     sub=remaining+" thing"+(remaining!==1?"s":"")+" on your list"; color="#f87171"; }
-  document.getElementById("motivate-msg").textContent = msg;
-  document.getElementById("motivate-msg").style.color = color;
-  document.getElementById("motivate-sub").textContent = sub;
-
-  document.getElementById("stat-done").textContent  = doneCount;
-  document.getElementById("stat-total").textContent = total;
-  document.getElementById("stat-left").textContent  = remaining;
-  document.getElementById("stat-done").parentElement.querySelector(".stat-lbl").textContent  = "DONE";
-  document.getElementById("stat-total").parentElement.querySelector(".stat-lbl").textContent = "TOTAL";
-  document.getElementById("stat-left").parentElement.querySelector(".stat-lbl").textContent  = "LEFT";
-  document.getElementById("stat-done").style.color  = "#4ade80";
-  document.getElementById("stat-total").style.color = "#333";
-  document.getElementById("stat-left").style.color  = remaining===0?"#4ade80":"#facc15";
-
-  const barsEl = document.getElementById("sec-bars");
-  barsEl.innerHTML = "";
-  SECTIONS.forEach(sec => {
-    const tasks = todayTasks.filter(t => t.section === sec.key);
-    if (!tasks.length) return;
-    const sd = tasks.filter(t => doneLog[t.id + "_" + key]).length;
-    const sp = Math.round((sd / tasks.length) * 100);
-    const bar = document.createElement("div");
-    bar.className = "bar-row";
-    bar.innerHTML = `<div class="bar-meta"><span class="bar-name">${sec.label.toUpperCase()}</span><span class="bar-count">${sd}/${tasks.length}</span></div><div class="bar-track"><div class="bar-fill" style="width:${sp}%;background:${sec.accent}"></div></div>`;
-    barsEl.appendChild(bar);
+  // ── SECTION BREAKDOWN ─────────────────────────────────────────────────────
+  const secSection = document.createElement("div");
+  secSection.className = "history-bar-section";
+  secSection.innerHTML = `<div class="stat-card-title" style="margin-bottom:14px">BREAKDOWN · ${rangeLabel.toUpperCase()}</div>`;
+  const secCounts = {};
+  filtered.forEach(e => {
+    const section = e.section || (([...sheetTasks,...customTasks].find(t=>t.id===e.taskId)||{}).section) || '';
+    if (section) secCounts[section] = (secCounts[section]||0) + 1;
   });
+  const secMax = Math.max(...Object.values(secCounts), 1);
+  SECTIONS.forEach(sec => {
+    const count = secCounts[sec.key] || 0;
+    if (!count) return;
+    const row = document.createElement("div");
+    row.className = "history-bar-row";
+    row.innerHTML = `
+      <div class="history-bar-meta">
+        <span class="history-bar-name">${sec.label.toUpperCase()}</span>
+        <span class="history-bar-val">${count}</span>
+      </div>
+      <div class="history-bar-track">
+        <div class="history-bar-fill" style="width:${Math.round(count/secMax*100)}%;background:${sec.accent}"></div>
+      </div>`;
+    secSection.appendChild(row);
+  });
+  el.appendChild(secSection);
 
-  // Top bar
-  const fill = document.getElementById("top-bar-fill");
-  fill.style.width = pct + "%";
-  const tbc = pct===100?"#4ade80":pct>=70?"#a3e635":pct>=40?"#facc15":"#f87171";
-  fill.style.background = `linear-gradient(90deg, ${tbc}, ${tbc}aa)`;
+  // ── TOP TASKS ─────────────────────────────────────────────────────────────
+  const taskCounts = {}, taskMeta = {};
+  filtered.forEach(e => {
+    taskCounts[e.taskId] = (taskCounts[e.taskId]||0) + 1;
+    if (!taskMeta[e.taskId]) {
+      const t = [...sheetTasks,...customTasks].find(t => t.id === e.taskId);
+      taskMeta[e.taskId] = { name: e.name||(t&&t.name)||e.taskId, emoji: e.emoji||(t&&t.emoji)||'✓' };
+    }
+  });
+  const topTasks = Object.entries(taskCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  if (topTasks.length > 0) {
+    const topSection = document.createElement("div");
+    topSection.className = "stat-card";
+    topSection.innerHTML = `<div class="stat-card-title">MOST COMPLETED · ${rangeLabel.toUpperCase()}</div>`;
+    topTasks.forEach(([id, count], i) => {
+      const meta = taskMeta[id] || {};
+      const row  = document.createElement("div");
+      row.className = "top-task-row";
+      row.innerHTML = `
+        <div class="top-task-rank">${i+1}</div>
+        <div class="top-task-emoji">${meta.emoji||'✓'}</div>
+        <div class="top-task-name">${meta.name||id}</div>
+        <div class="top-task-count">${count}×</div>`;
+      topSection.appendChild(row);
+    });
+    el.appendChild(topSection);
+  }
+
+  // ── MILESTONES ────────────────────────────────────────────────────────────
+  const MILESTONES = [
+    { icon:'🌱', n:1,    label:'First completion recorded' },
+    { icon:'✦',  n:10,   label:'10 tasks completed' },
+    { icon:'⬡',  n:50,   label:'50 tasks completed' },
+    { icon:'◈',  n:100,  label:'100 tasks completed' },
+    { icon:'◉',  n:250,  label:'250 tasks completed' },
+    { icon:'❋',  n:500,  label:'500 tasks completed' },
+    { icon:'✦',  n:1000, label:'1,000 tasks completed' },
+    { icon:'🔥', n:7,    label:'7-day streak', type:'streak' },
+    { icon:'🔥', n:30,   label:'30-day streak', type:'streak' },
+  ];
+  const msSection = document.createElement("div");
+  msSection.className = "stat-card";
+  msSection.innerHTML = `<div class="stat-card-title">MILESTONES</div>`;
+  MILESTONES.forEach(ms => {
+    const achieved    = ms.type === 'streak' ? longestStreak >= ms.n : allTimeDone >= ms.n;
+    const sorted      = [...rawHistory].sort((a,b)=>a.dateKey.localeCompare(b.dateKey));
+    const achievedDate = (!ms.type && achieved && sorted[ms.n-1]) ? sorted[ms.n-1].dateKey : '';
+    const row = document.createElement("div");
+    row.className = "milestone-row" + (achieved ? "" : " locked");
+    row.innerHTML = `
+      <div class="milestone-icon">${ms.icon}</div>
+      <div class="milestone-text">
+        <div class="milestone-name">${ms.label}</div>
+        <div class="milestone-date">${achieved && achievedDate
+          ? MONTHS[new Date(achievedDate+'T00:00:00').getMonth()].slice(0,3)+' '+new Date(achievedDate+'T00:00:00').getDate()+', '+new Date(achievedDate+'T00:00:00').getFullYear()
+          : achieved ? '' : 'not yet reached'}</div>
+      </div>`;
+    msSection.appendChild(row);
+  });
+  el.appendChild(msSection);
+
+  updateHistoryRightColumn(allTimeDone, streak, longestStreak, avgPerDay);
 }
 
-// ─── VIEW SWITCHING ───────────────────────────────────────────────────────────
-function switchView(view) {
-  currentView = view;
-  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-  document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
-  document.getElementById("view-today").style.display   = view === 'today'   ? 'block' : 'none';
-  document.getElementById("view-week").style.display    = view === 'week'    ? 'block' : 'none';
-  document.getElementById("view-history").style.display = view === 'history' ? 'block' : 'none';
-  document.getElementById("edit-btn").style.display     = view === 'today'   ? 'block' : 'none';
-  if (view === 'today')   render();
-  if (view === 'week')    renderWeek();
-  if (view === 'history') renderHistory();
-}
-
-function setRange(days, btn) {
-  historyRangeDays = days;
-  document.querySelectorAll(".range-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  renderHistory();
+function updateHistoryRightColumn(allTimeDone, streak, longestStreak, avgPerDay) {
+  const pct      = longestStreak > 0 ? Math.min(100, Math.round((streak/longestStreak)*100)) : 0;
+  const rc       = streak >= 7 ? "#4ade80" : streak >= 3 ? "#facc15" : "#f87171";
+  const ringFill = document.getElementById("ring-fill");
+  ringFill.style.strokeDashoffset = CIRC * (1 - pct/100);
+  ringFill.style.stroke = allTimeDone === 0 ? "#1a1a1a" : rc;
+  document.getElementById("ring-pct").innerHTML = streak > 0
+    ? streak + '<span style="font-size:16px;letter-spacing:0;color:#555"> days</span>'
+    : '0<span>%</span>';
+  document.getElementById("ring-label").textContent = "STREAK";
+  document.getElementById("motivate-msg").textContent =
+    allTimeDone === 0 ? "Just getting started." :
+    streak >= 30 ? "Exceptional." : streak >= 14 ? "Unstoppable." :
+    streak >= 7  ? "On a roll."   : streak >= 3  ? "Building." : "Keep going.";
+  document.getElementById("motivate-msg").style.color = allTimeDone === 0 ? "#2a2a2a" : rc;
+  document.getElementById("motivate-sub").textContent = allTimeDone > 0
+    ? allTimeDone.toLocaleString() + " total · " + avgPerDay + " avg/day"
+    : "History builds over time";
+  document.getElementById("stat-done").textContent  = allTimeDone.toLocaleString();
+  document.getElementById("stat-total").textContent = streak;
+  document.getElementById("stat-left").textContent  = longestStreak;
+  document.getElementById("stat-done").parentElement.querySelector(".stat-lbl").textContent  = "ALL TIME";
+  document.getElementById("stat-total").parentElement.querySelector(".stat-lbl").textContent = "STREAK";
+  document.getElementById("stat-left").parentElement.querySelector(".stat-lbl").textContent  = "BEST";
+  document.getElementById("stat-done").style.color  = "#ffffff";
+  document.getElementById("stat-total").style.color = "#4ade80";
+  document.getElementById("stat-left").style.color  = "#facc15";
+  document.getElementById("sec-bars").innerHTML = "";
+  document.getElementById("footer-note").textContent = "Permanent record · Never resets";
 }
 
 // ─── INTERACTIONS ─────────────────────────────────────────────────────────────
