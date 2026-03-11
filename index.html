@@ -382,6 +382,41 @@
   .identity-btn:hover:not(.active) { border-color: #333; color: #555; }
 
   /* ── ADD TASK MODAL OVERLAY ── */
+  /* ── IDENTITY MODAL ── */
+  #identity-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 200;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    align-items: center; justify-content: center;
+  }
+  #identity-modal-overlay.open { display: flex; }
+  #identity-modal {
+    background: #0e0e0e; border: 1px solid #1e1e1e;
+    border-radius: 20px; padding: 36px 32px 32px;
+    text-align: center; max-width: 320px; width: 90%;
+    animation: slideUp 0.25s cubic-bezier(0.4,0,0.2,1);
+  }
+  #identity-modal-label {
+    font-size: 9px; color: #333; letter-spacing: 3px;
+    font-weight: 600; margin-bottom: 6px;
+  }
+  #identity-modal-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px; font-weight: 300; color: #ffffff;
+    margin-bottom: 28px; line-height: 1.2;
+  }
+  .identity-modal-btn {
+    display: block; width: 100%;
+    background: none; border: 1px solid #1e1e1e; color: #888;
+    border-radius: 12px; padding: 14px;
+    font-family: 'Outfit', sans-serif; font-size: 11px;
+    font-weight: 600; letter-spacing: 2px;
+    cursor: pointer; transition: all 0.2s; margin-bottom: 10px;
+  }
+  .identity-modal-btn:hover { border-color: #4ade80; color: #4ade80; background: rgba(74,222,128,0.04); }
+  .identity-modal-btn:last-child { margin-bottom: 0; color: #2a2a2a; border-color: #161616; font-size: 10px; }
+  .identity-modal-btn:last-child:hover { border-color: #333; color: #444; background: none; }
+
   #task-modal-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,0.7); z-index: 100;
@@ -791,7 +826,16 @@
     </div>
 
     <!-- ADD TASK MODAL -->
-    <div id="task-modal-overlay" onclick="handleOverlayClick(event)">
+    <div id="identity-modal-overlay">
+    <div id="identity-modal">
+      <div id="identity-modal-label">CHECKING IN AS</div>
+      <div id="identity-modal-title">Who's managing<br>the house today?</div>
+      <button class="identity-modal-btn" onclick="setIdentityModal('Jackson')">JACKSON</button>
+      <button class="identity-modal-btn" onclick="setIdentityModal('Katelyn')">KATELYN</button>
+      <button class="identity-modal-btn" onclick="setIdentityModal('The Stewart Family')">SKIP · USE FAMILY</button>
+    </div>
+  </div>
+  <div id="task-modal-overlay" onclick="handleOverlayClick(event)">
       <div id="task-modal">
         <div class="modal-header">
           <span class="modal-title">ADD TASK</span>
@@ -1359,23 +1403,68 @@ let rawHistory       = [];
 let rawOTOEvents     = [];
 let pushForwardList  = loadPushFwd();
 
-// ── Identity ──────────────────────────────────────────────────────────────────
-function loadIdentity() { return localStorage.getItem('hd_identity') || 'Jackson'; }
-function saveIdentity(name) { localStorage.setItem('hd_identity', name); }
-let currentIdentity = loadIdentity();
+// ── Identity ─────────────────────────────────────────────────────────────────
+const IDENTITY_TTL = 12 * 60 * 60 * 1000; // 12 hours in ms
+const IDENTITY_KEY = 'hd_identity_v2'; // {name, setAt}
+
+function loadIdentityState() {
+  try {
+    const raw = localStorage.getItem(IDENTITY_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj.name || !obj.setAt) return null;
+    if (Date.now() - obj.setAt > IDENTITY_TTL) return null; // expired
+    return obj;
+  } catch { return null; }
+}
+
+function saveIdentityState(name) {
+  localStorage.setItem(IDENTITY_KEY, JSON.stringify({ name, setAt: Date.now() }));
+}
+
+const _identityState = loadIdentityState();
+let currentIdentity = _identityState ? _identityState.name : 'The Stewart Family';
 
 function setIdentity(name, btn) {
   currentIdentity = name;
-  saveIdentity(name);
+  saveIdentityState(name);
   document.querySelectorAll('.identity-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
+  // Hide the inline bar after selection — job done
+  const bar = document.getElementById('identity-bar');
+  if (bar) { bar.style.transition = 'opacity 0.4s'; bar.style.opacity = '0';
+    setTimeout(() => { bar.style.display = 'none'; }, 420); }
 }
 
-// Restore active identity button on load
-function restoreIdentityUI() {
+function setIdentityModal(name) {
+  currentIdentity = name;
+  if (name !== 'The Stewart Family') saveIdentityState(name);
+  // Close modal
+  document.getElementById('identity-modal-overlay').classList.remove('open');
+  // Sync inline bar if still visible
   document.querySelectorAll('.identity-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.trim() === currentIdentity.toUpperCase());
+    b.classList.toggle('active', b.textContent.trim() === name.toUpperCase());
   });
+  const bar = document.getElementById('identity-bar');
+  if (bar) { bar.style.transition = 'opacity 0.4s'; bar.style.opacity = '0';
+    setTimeout(() => { bar.style.display = 'none'; }, 420); }
+}
+
+function restoreIdentityUI() {
+  const state = loadIdentityState();
+  const bar   = document.getElementById('identity-bar');
+  if (state) {
+    // Valid session — hide bar, identity already set
+    currentIdentity = state.name;
+    if (bar) bar.style.display = 'none';
+  } else {
+    // No valid session — show prompt modal after brief load delay
+    currentIdentity = 'The Stewart Family';
+    if (bar) bar.style.display = 'flex';
+    setTimeout(() => {
+      document.getElementById('identity-modal-overlay').classList.add('open');
+    }, 800);
+  }
 }
 
 let currentView      = 'today';
@@ -1710,6 +1799,12 @@ function render() {
     // ── 2. RECURRING — sections with incomplete tasks first, fully-done sections last ──
     const recurringTasks = todayTasks.filter(t => t.type !== 'once');
     if (recurringTasks.length > 0) {
+      // If OTO tasks were shown above, add breathing room before first section
+      if (allOnceTasks.length > 0) {
+        const spacer = document.createElement("div");
+        spacer.style.cssText = "height:18px;";
+        listEl.appendChild(spacer);
+      }
 
       // Sort sections: any incomplete tasks → top; all complete → bottom
       const sortedSections = [...SECTIONS].sort((a, b) => {
