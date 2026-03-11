@@ -1117,19 +1117,40 @@ async function syncTodayState() {
     });
     const data = await res.json();
     if (!data.ok || !data.entries) return;
-    let changed = false;
+
+    // Build the sheet's authoritative set of checked taskIds for today
+    const sheetChecked = new Set();
     data.entries.forEach(entry => {
-      // Coerce all values to strings — Sheets can return Date objects or numbers
-      const taskId  = String(entry.taskId  || '').trim();
-      const dkStr   = String(entry.dateKey || '').trim();
-      // dateKey from sheet might be a Date object serialized oddly — re-derive from completedAt if needed
-      const resolvedDateKey = dkStr.length === 10 ? dkStr : todayKey;
-      const key = taskId + "_" + resolvedDateKey;
-      if (taskId && resolvedDateKey === todayKey && !doneLog[key]) {
+      const taskId      = String(entry.taskId  || '').trim();
+      const dkStr       = String(entry.dateKey || '').trim();
+      const resolvedKey = dkStr.length === 10 ? dkStr : todayKey;
+      if (taskId && resolvedKey === todayKey) sheetChecked.add(taskId);
+    });
+
+    let changed = false;
+
+    // ADD: entries in sheet but not in local doneLog
+    data.entries.forEach(entry => {
+      const taskId      = String(entry.taskId  || '').trim();
+      const dkStr       = String(entry.dateKey || '').trim();
+      const resolvedKey = dkStr.length === 10 ? dkStr : todayKey;
+      const key         = taskId + "_" + resolvedKey;
+      if (taskId && resolvedKey === todayKey && !doneLog[key]) {
         doneLog[key] = entry.completedAt ? String(entry.completedAt) : new Date().toISOString();
         changed = true;
       }
     });
+
+    // REMOVE: entries in local doneLog for today that are no longer in sheet
+    Object.keys(doneLog).forEach(key => {
+      if (!key.endsWith("_" + todayKey)) return;
+      const taskId = key.replace("_" + todayKey, "");
+      if (!sheetChecked.has(taskId)) {
+        delete doneLog[key];
+        changed = true;
+      }
+    });
+
     if (changed) { saveDone(doneLog); render(); }
   } catch(err) { console.warn("syncTodayState failed:", err); }
 }
