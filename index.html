@@ -127,6 +127,15 @@
     background: linear-gradient(90deg, transparent, #333, transparent);
     margin-top: 10px;
   }
+  #checkin-indicator {
+    margin-top: 10px; font-size: 9px; letter-spacing: 2px;
+    font-family: 'Outfit', sans-serif; font-weight: 600;
+    color: #1e1e1e; transition: color 0.4s;
+    min-height: 13px;
+  }
+  #checkin-indicator.jackson { color: rgba(74,222,128,0.5); }
+  #checkin-indicator.katelyn { color: rgba(168,85,247,0.5); }
+  #checkin-indicator.family  { color: #222; }
 
   /* ── GREETING ── */
   #greeting-wrap {
@@ -941,6 +950,7 @@
         <div id="brand-copy">©</div>
       </div>
       <div id="brand-rule"></div>
+      <div id="checkin-indicator"></div>
     </div>
     <div id="right-main">
     <div id="greeting-wrap">
@@ -1431,24 +1441,34 @@ function setIdentity(name, btn) {
   saveIdentityState(name);
   document.querySelectorAll('.identity-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  // Hide the inline bar after selection — job done
   const bar = document.getElementById('identity-bar');
   if (bar) { bar.style.transition = 'opacity 0.4s'; bar.style.opacity = '0';
     setTimeout(() => { bar.style.display = 'none'; }, 420); }
+  updateCheckinIndicator(name);
+}
+
+function updateCheckinIndicator(name) {
+  const el = document.getElementById('checkin-indicator');
+  if (!el) return;
+  if (!name || name === 'The Stewart Family') {
+    el.textContent = ''; el.className = 'family';
+  } else {
+    el.textContent = name.toUpperCase();
+    el.className = name === 'Katelyn' ? 'katelyn' : 'jackson';
+  }
 }
 
 function setIdentityModal(name) {
   currentIdentity = name;
   if (name !== 'The Stewart Family') saveIdentityState(name);
-  // Close modal
   document.getElementById('identity-modal-overlay').classList.remove('open');
-  // Sync inline bar if still visible
   document.querySelectorAll('.identity-btn').forEach(b => {
     b.classList.toggle('active', b.textContent.trim() === name.toUpperCase());
   });
   const bar = document.getElementById('identity-bar');
   if (bar) { bar.style.transition = 'opacity 0.4s'; bar.style.opacity = '0';
     setTimeout(() => { bar.style.display = 'none'; }, 420); }
+  updateCheckinIndicator(name);
 }
 
 function restoreIdentityUI() {
@@ -1458,6 +1478,7 @@ function restoreIdentityUI() {
     // Valid session — hide bar, identity already set
     currentIdentity = state.name;
     if (bar) bar.style.display = 'none';
+    updateCheckinIndicator(state.name);
   } else {
     // No valid session — show prompt modal after brief load delay
     currentIdentity = 'The Stewart Family';
@@ -1483,12 +1504,13 @@ const today    = new Date(todayKey + 'T00:00:00'); // midnight local
 const weekDates = Array.from({length:7}, (_,i) => addDays(today, i+1));
 
 // ─── FORMAT HELPERS ───────────────────────────────────────────────────────────
-function formatStamp(isoString) {
+function formatStamp(isoString, who) {
   const d = new Date(isoString);
   const h = d.getHours() % 12 || 12;
   const m = String(d.getMinutes()).padStart(2, "0");
   const ampm = d.getHours() >= 12 ? "PM" : "AM";
-  return `${h}:${m} ${ampm}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
+  const base = `${h}:${m} ${ampm}, ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
+  return who && who !== 'The Stewart Family' ? base + ' by ' + who : base;
 }
 
 // ─── 11:59 PM COMMIT ─────────────────────────────────────────────────────────
@@ -1746,10 +1768,10 @@ function renderInPlace() {
       row.classList.remove('done');
       if (task.type === 'once') { row.classList.add('once'); }
     }
-    const stampText = isDone ? 'Last completed ' + formatStamp(doneLog[task.id+'_'+todayKey]) : null;
+    const stampText = isDone ? 'Last completed ' + formatStamp(doneLog[task.id+'_'+todayKey], currentIdentity) : null;
     const permEntry = permanentHistory[task.id];
     const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
-      ? 'Last completed ' + formatStamp(permEntry.completedAt) : null;
+      ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
     if (fr) fr.textContent = stampText || permStamp || freqLabel(task);
     if (fr) fr.className = 'task-freq' + (isDone ? ' stamped' : '');
   });
@@ -1833,10 +1855,10 @@ function render() {
         sortedSec.forEach(task => {
           const isDone    = !!doneLog[task.id + "_" + todayKey];
           const isCustom  = customTasks.some(c => c.id === task.id);
-          const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey]) : null;
+          const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey], currentIdentity) : null;
           const permEntry = permanentHistory[task.id];
           const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
-            ? "Last completed " + formatStamp(permEntry.completedAt) : null;
+            ? "Last completed " + formatStamp(permEntry.completedAt, permEntry.who) : null;
           listEl.appendChild(buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false));
         });
       });
