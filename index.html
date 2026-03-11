@@ -943,7 +943,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.10.5 · pre-release</div>
+    <div id="version-tag">v0.10.6 · pre-release</div>
   </div>
   </div>
 
@@ -1063,7 +1063,10 @@ function isDueOn(task, d) {
 
 function isDueToday(task, d) {
   if (task.type === 'once') {
-    const dk = dateKey(d);
+    const dk  = dateKey(d);
+    // Always show a completed OTO task — it must remain visible after checking
+    if (doneLog[task.id + '_' + dk]) return true;
+
     if (!task.targetDate) return true; // no target date — show daily until done
 
     // Push-forward overrides — show if in pushForwardList
@@ -1597,7 +1600,8 @@ async function performCommit(_dateKey) {  // _dateKey unused — todayKey is glo
     if (key.endsWith("_" + todayKey)) {
       const taskId = key.replace("_" + todayKey, "");
       const meta   = taskMetaMap[taskId] || {};
-      entries.push({ taskId, completedAt: doneLog[key], dateKey: todayKey, name: meta.name||'', section: meta.section||'', emoji: meta.emoji||'' });
+      const _ce2 = doneEntry(key);
+      entries.push({ taskId, completedAt: _ce2 ? _ce2.ts : new Date().toISOString(), dateKey: todayKey, name: meta.name||'', section: meta.section||'', emoji: meta.emoji||'', who: _ce2 && _ce2.who ? _ce2.who : currentIdentity });
     }
   });
 
