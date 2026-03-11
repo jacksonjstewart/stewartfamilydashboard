@@ -1718,6 +1718,79 @@ function renderWeek() {
   });
 }
 
+// ─── RIGHT COLUMN: TODAY ─────────────────────────────────────────────────────
+function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key) {
+  const rc = pct === 100 ? "#4ade80" : pct >= 60 ? "#a3e635" : pct >= 30 ? "#facc15" : "#f87171";
+  const ringFill = document.getElementById("ring-fill");
+  const wasFull  = ringFill.dataset.wasFull === "1";
+  ringFill.style.strokeDashoffset = CIRC * (1 - pct / 100);
+  ringFill.style.stroke = rc;
+  document.getElementById("ring-pct").innerHTML = pct + '<span>%</span>';
+  document.getElementById("ring-label").textContent = "COMPLETE";
+
+  // Pulse on hitting 100%
+  if (pct === 100 && !wasFull) {
+    ringFill.dataset.wasFull = "1";
+    const svg = document.querySelector("#ring-wrap svg");
+    svg.classList.remove("pulse"); void svg.offsetWidth; svg.classList.add("pulse");
+    svg.addEventListener("animationend", () => svg.classList.remove("pulse"), { once: true });
+  } else if (pct < 100) { ringFill.dataset.wasFull = ""; }
+
+  // Motivate message
+  const msgEl = document.getElementById("motivate-msg");
+  const subEl = document.getElementById("motivate-sub");
+  if (total === 0) {
+    msgEl.textContent = "All clear."; msgEl.style.color = "#333";
+    subEl.textContent = "Nothing scheduled today";
+  } else if (pct === 100) {
+    msgEl.textContent = "Perfect day."; msgEl.style.color = "#4ade80";
+    subEl.textContent = "Everything done · " + doneCount + " tasks";
+  } else if (pct >= 60) {
+    msgEl.textContent = "Good progress."; msgEl.style.color = rc;
+    subEl.textContent = remaining + " remaining · " + doneCount + " done";
+  } else if (pct > 0) {
+    msgEl.textContent = "Getting there."; msgEl.style.color = rc;
+    subEl.textContent = remaining + " remaining · " + doneCount + " done";
+  } else {
+    msgEl.textContent = "Fresh start."; msgEl.style.color = "#f87171";
+    subEl.textContent = total + " tasks today";
+  }
+
+  // Stats
+  document.getElementById("stat-done").textContent  = doneCount;
+  document.getElementById("stat-total").textContent = total;
+  document.getElementById("stat-left").textContent  = remaining;
+  document.getElementById("stat-done").parentElement.querySelector(".stat-lbl").textContent  = "DONE";
+  document.getElementById("stat-total").parentElement.querySelector(".stat-lbl").textContent = "TOTAL";
+  document.getElementById("stat-left").parentElement.querySelector(".stat-lbl").textContent  = "LEFT";
+  document.getElementById("stat-done").style.color  = "#4ade80";
+  document.getElementById("stat-total").style.color = "#333";
+  document.getElementById("stat-left").style.color  = "#facc15";
+
+  // Section bars
+  const barsEl = document.getElementById("sec-bars");
+  barsEl.innerHTML = "";
+  SECTIONS.forEach(sec => {
+    const tasks = todayTasks.filter(t => t.section === sec.key);
+    if (!tasks.length) return;
+    const sd = tasks.filter(t => doneLog[t.id + "_" + key]).length;
+    const sp = Math.round((sd / tasks.length) * 100);
+    const bar = document.createElement("div");
+    bar.className = "bar-row";
+    bar.innerHTML = `<div class="bar-meta"><span class="bar-name">${sec.label.toUpperCase()}</span><span class="bar-count">${sd}/${tasks.length}</span></div><div class="bar-track"><div class="bar-fill" style="width:${sp}%;background:${sec.accent}"></div></div>`;
+    barsEl.appendChild(bar);
+  });
+
+  // Top progress bar
+  const fill = document.getElementById("top-bar-fill");
+  fill.style.width = pct + "%";
+  const tbc = pct === 100 ? "#4ade80" : pct >= 70 ? "#a3e635" : pct >= 40 ? "#facc15" : "#f87171";
+  fill.style.background = `linear-gradient(90deg, ${tbc}, ${tbc}aa)`;
+
+  // Footer
+  document.getElementById("footer-note").textContent = "Syncs from Google Sheets · Resets daily · Tap to mark done";
+}
+
 // ─── RENDER HISTORY ───────────────────────────────────────────────────────────
 function renderHistory() {
   const el = document.getElementById("history-content");
