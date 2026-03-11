@@ -574,6 +574,51 @@
   .top-task-name { font-size: 13px; color: #888; flex: 1; }
   .top-task-count { font-size: 11px; color: #333; flex-shrink: 0; }
 
+  /* ── SPARKLINE ── */
+  #sparkline-wrap { margin-top: 16px; position: relative; height: 36px; }
+  #sparkline-canvas { width: 100%; height: 36px; display: block; opacity: 0.7; }
+  #sparkline-hint { font-size: 9px; color: #252525; letter-spacing: 1.5px; margin-top: 4px; }
+
+  /* ── BEST WEEK INLINE ── */
+  #best-week-line {
+    font-size: 11px; color: #2a2a2a; margin-top: 8px; letter-spacing: 0.3px;
+  }
+  #best-week-line span { color: #444; }
+
+  /* ── DAY OF WEEK BARS ── */
+  .dow-grid {
+    display: flex; gap: 6px; align-items: flex-end;
+    height: 48px; margin-top: 4px;
+  }
+  .dow-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dow-bar-wrap { width: 100%; flex: 1; display: flex; align-items: flex-end; }
+  .dow-bar {
+    width: 100%; border-radius: 3px 3px 0 0;
+    background: #1a1a1a; min-height: 2px;
+    transition: height 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  .dow-bar.peak { background: #4ade80; opacity: 0.7; }
+  .dow-bar.empty { background: #141414; }
+  .dow-lbl { font-size: 8px; color: #2a2a2a; letter-spacing: 0.5px; }
+  .dow-val  { font-size: 9px; color: #333; }
+
+  /* ── INSIGHT STRIP (OTO ratio, compact) ── */
+  .insight-strip {
+    display: flex; gap: 0; margin-bottom: 10px;
+    border: 1px solid #111; border-radius: 14px; overflow: hidden;
+  }
+  .insight-cell {
+    flex: 1; padding: 16px 14px; text-align: center;
+    border-right: 1px solid #111;
+  }
+  .insight-cell:last-child { border-right: none; }
+  .insight-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px; font-weight: 300; color: #ffffff; line-height: 1;
+  }
+  .insight-val.dim { color: #222; }
+  .insight-lbl { font-size: 8px; color: #252525; letter-spacing: 2px; margin-top: 4px; }
+
   /* ── MILESTONES ── */
   .milestone-row {
     display: flex; align-items: center; gap: 12px;
@@ -809,7 +854,7 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="version-tag">v0.9.5 · pre-release</div>
+  <div id="version-tag">v0.9.6 · pre-release</div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -1058,22 +1103,23 @@ async function fetchHistory() {
     const res = await fetch(API_URL);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    if (Array.isArray(data)) {
-      permanentHistory = {};
-      data.forEach(entry => {
-        if (!permanentHistory[entry.taskId] ||
-            new Date(entry.completedAt) > new Date(permanentHistory[entry.taskId].completedAt)) {
-          permanentHistory[entry.taskId] = entry;
-        }
-      });
-      // Also build raw history array for analytics
-      rawHistory = data;
-      try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory })); } catch(e) {}
-    }
+    // Support both old array format and new {history, otoEvents} format
+    const entries   = Array.isArray(data) ? data : (data.history   || []);
+    const otoEvents = Array.isArray(data) ? []   : (data.otoEvents  || []);
+    permanentHistory = {};
+    entries.forEach(entry => {
+      if (!permanentHistory[entry.taskId] ||
+          new Date(entry.completedAt) > new Date(permanentHistory[entry.taskId].completedAt)) {
+        permanentHistory[entry.taskId] = entry;
+      }
+    });
+    rawHistory  = entries;
+    rawOTOEvents = otoEvents;
+    try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory, oto: rawOTOEvents })); } catch(e) {}
   } catch(err) {
     try {
       const c = JSON.parse(localStorage.getItem("hd_history_cache") || "null");
-      if (c) { permanentHistory = c.perm || {}; rawHistory = c.raw || []; }
+      if (c) { permanentHistory = c.perm || {}; rawHistory = c.raw || []; rawOTOEvents = c.oto || []; }
     } catch(e) {}
   }
   if (currentView === 'history') renderHistory();
@@ -1281,6 +1327,7 @@ let customTasks      = loadCustom();
 let doneLog          = loadDone();
 let permanentHistory = {};
 let rawHistory       = [];
+let rawOTOEvents     = [];
 let pushForwardList  = loadPushFwd();
 
 let currentView      = 'today';
@@ -1865,86 +1912,29 @@ function renderHistory() {
   const el = document.getElementById("history-content");
   el.innerHTML = "";
 
+  // ── Core data ──────────────────────────────────────────────────────────────
   const allTimeDone = rawHistory.length;
   const allTimeDays = new Set(rawHistory.map(e => e.dateKey)).size;
+  const hasData     = allTimeDone > 0;
 
-  const cutoff  = new Date();
-  cutoff.setDate(cutoff.getDate() - historyRangeDays);
-  const filtered = historyRangeDays >= 99999
-    ? rawHistory
-    : rawHistory.filter(e => new Date(e.completedAt) >= cutoff);
-
-  // ── ALL-TIME COUNTER ─────────────────────────────────────────────────────
-  const firstDate = rawHistory.length > 0
-    ? rawHistory.reduce((a,b) => a.dateKey < b.dateKey ? a : b).dateKey
-    : null;
-  const counterEl = document.createElement("div");
-  counterEl.id = "alltime-counter";
-  counterEl.innerHTML = `
-    <div id="alltime-label">TASKS COMPLETED · ALL TIME</div>
-    <div id="alltime-number">${allTimeDone.toLocaleString()}</div>
-    <div id="alltime-sub">${allTimeDays} active day${allTimeDays !== 1 ? 's' : ''} · tracking since ${firstDate ? MONTHS[new Date(firstDate+'T00:00:00').getMonth()].slice(0,3) + ' ' + new Date(firstDate+'T00:00:00').getDate() + ', ' + new Date(firstDate+'T00:00:00').getFullYear() : '—'}</div>`;
-  el.appendChild(counterEl);
-
-  // ── CONTRIBUTION HEATMAP ─────────────────────────────────────────────────
+  // Include today's live checks in day counts
   const dayCounts = {};
   rawHistory.forEach(e => { dayCounts[e.dateKey] = (dayCounts[e.dateKey] || 0) + 1; });
   Object.keys(doneLog).forEach(k => {
     if (k.endsWith("_" + todayKey)) dayCounts[todayKey] = (dayCounts[todayKey] || 0) + 1;
   });
-  const maxCount  = Math.max(...Object.values(dayCounts), 1);
-  const heatStart = addDays(today, -182);
-  const gridStart = addDays(heatStart, -heatStart.getDay());
 
-  const cols = [];
-  let d = new Date(gridStart);
-  while (d <= today) {
-    const col = [];
-    for (let row = 0; row < 7; row++) {
-      const dk    = dateKey(d);
-      const count = dayCounts[dk] || 0;
-      const isFuture = d > today;
-      let heat = 0;
-      if (!isFuture && count > 0) {
-        const ratio = count / maxCount;
-        heat = ratio < 0.25 ? 1 : ratio < 0.5 ? 2 : ratio < 0.75 ? 3 : 4;
-      }
-      col.push({ dk, count, isFuture, heat });
-      d = addDays(d, 1);
-    }
-    cols.push(col);
-  }
-  const monthLabelHTML = cols.map(col => {
-    const fd = new Date(col[0].dk + "T00:00:00");
-    return `<div class="heatmap-month-lbl">${fd.getDate() <= 7 ? MONTHS[fd.getMonth()].slice(0,3) : ''}</div>`;
-  }).join('');
-  const colsHTML = cols.map(col =>
-    `<div class="heatmap-col">${col.map(cell =>
-      `<div class="heatmap-cell${cell.isFuture ? '' : ' h'+cell.heat}" title="${cell.dk}${cell.count ? ': '+cell.count+' task'+(cell.count!==1?'s':'') : ''}"></div>`
-    ).join('')}</div>`
-  ).join('');
+  // Range-filtered
+  const cutoff   = new Date(); cutoff.setDate(cutoff.getDate() - historyRangeDays);
+  const filtered = historyRangeDays >= 99999
+    ? rawHistory : rawHistory.filter(e => new Date(e.completedAt) >= cutoff);
 
-  const heatmapWrap = document.createElement("div");
-  heatmapWrap.id = "heatmap-wrap";
-  heatmapWrap.innerHTML = `
-    <div id="heatmap-label">ACTIVITY · LAST 26 WEEKS</div>
-    <div class="heatmap-month-labels">${monthLabelHTML}</div>
-    <div id="heatmap">${colsHTML}</div>`;
-  el.appendChild(heatmapWrap);
-
-  if (filtered.length === 0) {
-    el.insertAdjacentHTML("beforeend", '<div class="history-empty" style="margin-top:8px">No completions yet in this period. Check back after tonight\'s commit.</div>');
-    updateHistoryRightColumn(0, 0, 0, "0");
-    return;
-  }
-
-  // ── STREAKS ──────────────────────────────────────────────────────────────
+  // ── Streaks ────────────────────────────────────────────────────────────────
   let streak = 0, longestStreak = 0, tempStreak = 0;
   const checkD = new Date(today);
   while (true) {
-    const k   = dateKey(checkD);
-    const has = (dayCounts[k] || 0) > 0;
-    if (has) { streak++; checkD.setDate(checkD.getDate() - 1); }
+    const k = dateKey(checkD);
+    if ((dayCounts[k] || 0) > 0) { streak++; checkD.setDate(checkD.getDate() - 1); }
     else break;
   }
   const allDaysSorted = [...new Set(rawHistory.map(e => e.dateKey))].sort();
@@ -1957,30 +1947,136 @@ function renderHistory() {
   });
   longestStreak = Math.max(longestStreak, streak);
 
-  const uniqueDays  = new Set(filtered.map(e => e.dateKey)).size;
-  const totalDone   = filtered.length;
-  const avgPerDay   = uniqueDays > 0 ? (totalDone / uniqueDays).toFixed(1) : "0";
-  const rangeLabel  = historyRangeDays >= 99999 ? "all time" : "last " + historyRangeDays + " days";
+  const uniqueDays = new Set(filtered.map(e => e.dateKey)).size;
+  const totalDone  = filtered.length;
+  const avgPerDay  = uniqueDays > 0 ? (totalDone / uniqueDays).toFixed(1) : "0";
+  const rangeLabel = historyRangeDays >= 99999 ? "all time" : "last " + historyRangeDays + " days";
 
-  // ── STREAK BOXES ─────────────────────────────────────────────────────────
-  const streakRow = document.createElement("div");
-  streakRow.className = "streak-row";
-  streakRow.innerHTML = `
-    <div class="streak-box ${streak >= 3 ? 'lit' : ''}">
-      <div class="streak-val">${streak}</div>
-      <div class="streak-lbl">CURRENT STREAK</div>
-    </div>
-    <div class="streak-box ${longestStreak >= 7 ? 'lit' : ''}">
-      <div class="streak-val">${longestStreak}</div>
-      <div class="streak-lbl">BEST STREAK</div>
+  // ── Best week ─────────────────────────────────────────────────────────────
+  // Group rawHistory by ISO week (Mon-Sun)
+  function isoWeekKey(dk) {
+    const d = new Date(dk + 'T00:00:00');
+    const day = d.getDay() === 0 ? 6 : d.getDay() - 1; // Mon=0
+    const monday = new Date(d); monday.setDate(d.getDate() - day);
+    return dateKey(monday);
+  }
+  const weekCounts = {};
+  rawHistory.forEach(e => {
+    const wk = isoWeekKey(e.dateKey);
+    weekCounts[wk] = (weekCounts[wk] || 0) + 1;
+  });
+  const bestWeekEntry = Object.entries(weekCounts).sort((a,b) => b[1]-a[1])[0];
+  const bestWeekCount = bestWeekEntry ? bestWeekEntry[1] : 0;
+  const bestWeekDate  = bestWeekEntry ? bestWeekEntry[0] : null;
+
+  // ── ALL-TIME COUNTER ──────────────────────────────────────────────────────
+  const firstDate = rawHistory.length > 0
+    ? rawHistory.reduce((a,b) => a.dateKey < b.dateKey ? a : b).dateKey : null;
+  const counterEl = document.createElement("div");
+  counterEl.id = "alltime-counter";
+  const sinceLine = firstDate
+    ? MONTHS[new Date(firstDate+'T00:00:00').getMonth()].slice(0,3) + ' ' +
+      new Date(firstDate+'T00:00:00').getDate() + ', ' +
+      new Date(firstDate+'T00:00:00').getFullYear()
+    : '—';
+  const bestWeekLine = bestWeekDate
+    ? `Best week: <span>${bestWeekCount} tasks</span> · week of ${MONTHS[new Date(bestWeekDate+'T00:00:00').getMonth()].slice(0,3)} ${new Date(bestWeekDate+'T00:00:00').getDate()}`
+    : `Best week: <span style="color:#1e1e1e">no data yet</span>`;
+  counterEl.innerHTML = `
+    <div id="alltime-label">TASKS COMPLETED · ALL TIME</div>
+    <div id="alltime-number">${hasData ? allTimeDone.toLocaleString() : '<span style="color:#1a1a1a">0</span>'}</div>
+    <div id="alltime-sub">${hasData ? allTimeDays + ' active day' + (allTimeDays!==1?'s':'') + ' · tracking since ' + sinceLine : 'No completions committed yet — check back after tonight'}</div>
+    <div id="best-week-line">${bestWeekLine}</div>`;
+  el.appendChild(counterEl);
+
+  // ── HEATMAP ───────────────────────────────────────────────────────────────
+  const maxCount  = Math.max(...Object.values(dayCounts), 1);
+  const heatStart = addDays(today, -182);
+  const gridStart = addDays(heatStart, -heatStart.getDay());
+  const cols = [];
+  let d = new Date(gridStart);
+  while (d <= today) {
+    const col = [];
+    for (let row = 0; row < 7; row++) {
+      const dk = dateKey(d), count = dayCounts[dk] || 0, isFuture = d > today;
+      let heat = 0;
+      if (!isFuture && count > 0) {
+        const r = count / maxCount;
+        heat = r < 0.25 ? 1 : r < 0.5 ? 2 : r < 0.75 ? 3 : 4;
+      }
+      col.push({ dk, count, isFuture, heat });
+      d = addDays(d, 1);
+    }
+    cols.push(col);
+  }
+  const monthLabelHTML = cols.map(col => {
+    const fd = new Date(col[0].dk + 'T00:00:00');
+    return `<div class="heatmap-month-lbl">${fd.getDate() <= 7 ? MONTHS[fd.getMonth()].slice(0,3) : ''}</div>`;
+  }).join('');
+  const colsHTML = cols.map(col =>
+    `<div class="heatmap-col">${col.map(cell =>
+      `<div class="heatmap-cell${cell.isFuture ? '' : ' h'+cell.heat}" title="${cell.dk}${cell.count ? ': '+cell.count+' task'+(cell.count!==1?'s':'') : ''}"></div>`
+    ).join('')}</div>`
+  ).join('');
+
+  // Sparkline: weekly completion counts over last 26 weeks
+  const weekKeys = [];
+  for (let i = 25; i >= 0; i--) {
+    const monday = new Date(gridStart); monday.setDate(monday.getDate() + i * 7);
+    weekKeys.push(dateKey(monday));
+  }
+  const weeklyTotals = weekKeys.map(wk => weekCounts[wk] || 0);
+  const sparkMax = Math.max(...weeklyTotals, 1);
+  const sparkPts = weeklyTotals.map((v, i) => {
+    const x = (i / (weeklyTotals.length - 1)) * 100;
+    const y = 100 - (v / sparkMax) * 100;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const heatmapWrap = document.createElement("div");
+  heatmapWrap.id = "heatmap-wrap";
+  heatmapWrap.innerHTML = `
+    <div id="heatmap-label">ACTIVITY · LAST 26 WEEKS</div>
+    <div class="heatmap-month-labels">${monthLabelHTML}</div>
+    <div id="heatmap">${colsHTML}</div>
+    <div id="sparkline-wrap">
+      <svg id="sparkline-canvas" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polyline points="${sparkPts}" fill="none"
+          stroke="${hasData ? '#4ade80' : '#1e1e1e'}" stroke-width="1.5"
+          stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <div id="sparkline-hint">WEEKLY COMPLETIONS</div>
     </div>`;
-  el.appendChild(streakRow);
+  el.appendChild(heatmapWrap);
 
+  // ── INSIGHT STRIP: streaks + OTO ratio (compact, always visible) ──────────
+  const otoCompleted = rawOTOEvents.filter(e => e.status === 'completed').length;
+  const otoTotal     = rawOTOEvents.length;
+  const otoPct       = otoTotal > 0 ? Math.round((otoCompleted / otoTotal) * 100) : null;
+
+  const insightStrip = document.createElement("div");
+  insightStrip.className = "insight-strip";
+  insightStrip.innerHTML = `
+    <div class="insight-cell">
+      <div class="insight-val ${streak === 0 ? 'dim' : ''}">${streak}</div>
+      <div class="insight-lbl">STREAK</div>
+    </div>
+    <div class="insight-cell">
+      <div class="insight-val ${longestStreak === 0 ? 'dim' : ''}">${longestStreak}</div>
+      <div class="insight-lbl">BEST STREAK</div>
+    </div>
+    <div class="insight-cell">
+      <div class="insight-val ${otoPct === null ? 'dim' : ''}">${otoPct !== null ? otoPct + '%' : '—'}</div>
+      <div class="insight-lbl">OTO RATE</div>
+    </div>`;
+  el.appendChild(insightStrip);
+
+  // ── PERIOD STATS ROW ──────────────────────────────────────────────────────
   const statsRow = document.createElement("div");
   statsRow.className = "streak-row";
   statsRow.innerHTML = `
     <div class="streak-box">
-      <div class="streak-val">${totalDone}</div>
+      <div class="streak-val ${totalDone === 0 ? '' : ''}">${totalDone}</div>
       <div class="streak-lbl">IN PERIOD</div>
     </div>
     <div class="streak-box">
@@ -1989,32 +2085,61 @@ function renderHistory() {
     </div>`;
   el.appendChild(statsRow);
 
-  // ── SECTION BREAKDOWN ─────────────────────────────────────────────────────
-  const secSection = document.createElement("div");
-  secSection.className = "history-bar-section";
-  secSection.innerHTML = `<div class="stat-card-title" style="margin-bottom:14px">BREAKDOWN · ${rangeLabel.toUpperCase()}</div>`;
-  const secCounts = {};
-  filtered.forEach(e => {
-    const section = e.section || (([...sheetTasks,...customTasks].find(t=>t.id===e.taskId)||{}).section) || '';
-    if (section) secCounts[section] = (secCounts[section]||0) + 1;
+  // ── DAY OF WEEK + SECTION BREAKDOWN (single card, tabbed) ─────────────────
+  const allTimeBySection = {};
+  rawHistory.forEach(e => {
+    const sec = e.section || (([...sheetTasks,...customTasks].find(t=>t.id===e.taskId)||{}).section) || '';
+    if (sec) allTimeBySection[sec] = (allTimeBySection[sec]||0) + 1;
   });
-  const secMax = Math.max(...Object.values(secCounts), 1);
-  SECTIONS.forEach(sec => {
-    const count = secCounts[sec.key] || 0;
-    if (!count) return;
-    const row = document.createElement("div");
-    row.className = "history-bar-row";
-    row.innerHTML = `
+  const secMax = Math.max(...Object.values(allTimeBySection), 1);
+
+  // Day-of-week counts (0=Sun…6=Sat)
+  const dowCounts = [0,0,0,0,0,0,0];
+  rawHistory.forEach(e => {
+    const dow = new Date(e.dateKey + 'T00:00:00').getDay();
+    dowCounts[dow]++;
+  });
+  const dowMax     = Math.max(...dowCounts, 1);
+  const DOW_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const peakDow    = dowCounts.indexOf(Math.max(...dowCounts));
+
+  const analyticsCard = document.createElement("div");
+  analyticsCard.className = "stat-card";
+  const dowBars = DOW_LABELS.map((lbl, i) => {
+    const h   = hasData ? Math.max(2, Math.round((dowCounts[i] / dowMax) * 40)) : 2;
+    const cls = hasData && i === peakDow ? 'dow-bar peak' : hasData && dowCounts[i] === 0 ? 'dow-bar empty' : 'dow-bar';
+    return `<div class="dow-col">
+      <div class="dow-val">${hasData && dowCounts[i] > 0 ? dowCounts[i] : ''}</div>
+      <div class="dow-bar-wrap"><div class="${cls}" style="height:${h}px"></div></div>
+      <div class="dow-lbl">${lbl}</div>
+    </div>`;
+  }).join('');
+
+  const secBarsHTML = SECTIONS.map(sec => {
+    const count = allTimeBySection[sec.key] || 0;
+    const pct   = Math.round((count / secMax) * 100);
+    return `<div class="history-bar-row">
       <div class="history-bar-meta">
         <span class="history-bar-name">${sec.label.toUpperCase()}</span>
-        <span class="history-bar-val">${count}</span>
+        <span class="history-bar-val">${hasData ? count : '—'}</span>
       </div>
       <div class="history-bar-track">
-        <div class="history-bar-fill" style="width:${Math.round(count/secMax*100)}%;background:${sec.accent}"></div>
-      </div>`;
-    secSection.appendChild(row);
-  });
-  el.appendChild(secSection);
+        <div class="history-bar-fill" style="width:${hasData ? pct : 0}%;background:${sec.accent}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  analyticsCard.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="stat-card-title" style="margin-bottom:0">PATTERNS · ALL TIME</div>
+      ${!hasData ? '<div style="font-size:10px;color:#1e1e1e;letter-spacing:1px">awaiting data</div>' : ''}
+    </div>
+    <div class="stat-card-title" style="color:#1e1e1e;margin-bottom:8px">BY DAY OF WEEK</div>
+    <div class="dow-grid">${dowBars}</div>
+    <div style="height:1px;background:#0f0f0f;margin:18px 0"></div>
+    <div class="stat-card-title" style="color:#1e1e1e;margin-bottom:10px">BY SECTION · ALL TIME</div>
+    ${secBarsHTML}`;
+  el.appendChild(analyticsCard);
 
   // ── TOP TASKS ─────────────────────────────────────────────────────────────
   const taskCounts = {}, taskMeta = {};
@@ -2026,10 +2151,10 @@ function renderHistory() {
     }
   });
   const topTasks = Object.entries(taskCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const topSection = document.createElement("div");
+  topSection.className = "stat-card";
+  topSection.innerHTML = `<div class="stat-card-title">MOST COMPLETED · ${rangeLabel.toUpperCase()}</div>`;
   if (topTasks.length > 0) {
-    const topSection = document.createElement("div");
-    topSection.className = "stat-card";
-    topSection.innerHTML = `<div class="stat-card-title">MOST COMPLETED · ${rangeLabel.toUpperCase()}</div>`;
     topTasks.forEach(([id, count], i) => {
       const meta = taskMeta[id] || {};
       const row  = document.createElement("div");
@@ -2041,8 +2166,11 @@ function renderHistory() {
         <div class="top-task-count">${count}×</div>`;
       topSection.appendChild(row);
     });
-    el.appendChild(topSection);
+  } else {
+    topSection.insertAdjacentHTML("beforeend",
+      '<div class="top-task-row"><div class="top-task-name" style="color:#1e1e1e;font-style:italic">Tasks you complete most will appear here</div></div>');
   }
+  el.appendChild(topSection);
 
   // ── MILESTONES ────────────────────────────────────────────────────────────
   const MILESTONES = [
@@ -2058,10 +2186,13 @@ function renderHistory() {
   ];
   const msSection = document.createElement("div");
   msSection.className = "stat-card";
-  msSection.innerHTML = `<div class="stat-card-title">MILESTONES</div>`;
+  const otoLine = otoTotal > 0
+    ? `<div style="font-size:11px;color:#333;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #0f0f0f">${otoCompleted} of ${otoTotal} one-time event${otoTotal!==1?'s':''} completed</div>`
+    : `<div style="font-size:11px;color:#1e1e1e;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #0f0f0f;font-style:italic">No one-time events archived yet</div>`;
+  msSection.innerHTML = `<div class="stat-card-title">MILESTONES</div>${otoLine}`;
   MILESTONES.forEach(ms => {
-    const achieved    = ms.type === 'streak' ? longestStreak >= ms.n : allTimeDone >= ms.n;
-    const sorted      = [...rawHistory].sort((a,b)=>a.dateKey.localeCompare(b.dateKey));
+    const achieved     = ms.type === 'streak' ? longestStreak >= ms.n : allTimeDone >= ms.n;
+    const sorted       = [...rawHistory].sort((a,b)=>a.dateKey.localeCompare(b.dateKey));
     const achievedDate = (!ms.type && achieved && sorted[ms.n-1]) ? sorted[ms.n-1].dateKey : '';
     const row = document.createElement("div");
     row.className = "milestone-row" + (achieved ? "" : " locked");
