@@ -800,7 +800,10 @@ function isMirrorsWeek(d) {
 function isNthWeekday(d, dow, n) {
   return d.getDay() === dow && Math.ceil(d.getDate() / 7) === n;
 }
-function dateKey(d) { return d.toISOString().slice(0,10); }
+function dateKey(d) {
+  // Always use Edmonton local time, not UTC
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' });
+}
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 
 function isDueOn(task, d) {
@@ -979,12 +982,16 @@ async function fetchHistory() {
 }
 
 async function commitToHistory(entries, missedOTOs) {
+  if (!entries || entries.length === 0) return { ok: true };
   try {
-    await fetch(API_URL, {
+    const res  = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({ action: "commit", entries, missedOTOs: missedOTOs || [] })
     });
+    const data = await res.json();
+    if (!data.ok) { console.warn("Commit rejected by server:", data.error); return data; }
+    // Update local history cache only after confirmed server write
     entries.forEach(entry => {
       if (!permanentHistory[entry.taskId] ||
           new Date(entry.completedAt) > new Date(permanentHistory[entry.taskId].completedAt)) {
@@ -993,7 +1000,12 @@ async function commitToHistory(entries, missedOTOs) {
       rawHistory.push(entry);
     });
     try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory })); } catch(e) {}
-  } catch(err) { console.warn("Commit failed:", err); }
+    console.log("Commit OK:", entries.length, "entries for", entries[0]?.dateKey);
+    return { ok: true };
+  } catch(err) {
+    console.warn("Commit failed — will retry on next load:", err);
+    return { ok: false };
+  }
 }
 
 async function ensureOneTimeIds() {
@@ -1020,6 +1032,7 @@ async function ensureOneTimeIds() {
 // ─── SYNC ─────────────────────────────────────────────────────────────────────
 let sheetTasks = [];
 
+let _catchUpDone = false;
 async function syncFromSheet() {
   const el = document.getElementById("sync-status");
   el.textContent = "SYNCING…"; el.className = "syncing";
@@ -1046,6 +1059,11 @@ async function syncFromSheet() {
   document.getElementById("loading-state").style.display = "none";
   ensureOneTimeIds();
   render();
+  // Run catch-up once after first successful sheet load
+  if (!_catchUpDone) {
+    _catchUpDone = true;
+    await catchUpMissedCommits();
+  }
 }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -1066,8 +1084,12 @@ let currentView      = 'today';
 let selectedWeekDay  = 0; // index into weekDates array
 let historyRangeDays = 30;
 
-const today    = new Date(); today.setHours(0,0,0,0);
-const todayKey = today.toISOString().slice(0,10);
+// Use Edmonton local time for all date calculations
+function getEdmontonDateKey(d) {
+  return (d || new Date()).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' });
+}
+const todayKey = getEdmontonDateKey();
+const today    = new Date(todayKey + 'T00:00:00'); // midnight local
 
 // Build week ahead dates: tomorrow + 6 days
 const weekDates = Array.from({length:7}, (_,i) => addDays(today, i+1));
@@ -1117,8 +1139,11 @@ async function catchUpMissedCommits() {
 
     if (entries.length > 0) {
       console.log("Catching up missed commit for", dk, entries.length, "entries");
-      localStorage.setItem("hd_committed_" + dk, "1");
-      await commitToHistory(entries, []); // no missed OTO detection for old days
+      const result = await commitToHistory(entries, []);
+      // Only mark as committed if server confirmed — so we retry on next load if it failed
+      if (result && result.ok) {
+        localStorage.setItem("hd_committed_" + dk, "1");
+      }
     }
   }
   // Refresh history display after catch-up
@@ -1144,7 +1169,13 @@ async function performCommit() {
     return isOTOOverdue(task); // grace day ending tonight
   }).map(task => ({ taskId: task.id, dateKey: todayKey }));
 
-  await commitToHistory(entries, missedOTOs);
+  const commitResult = await commitToHistory(entries, missedOTOs);
+  if (!commitResult || !commitResult.ok) {
+    // Remove the committed flag so catchUp retries it next load
+    localStorage.removeItem("hd_committed_" + todayKey);
+    console.warn("Tonight commit failed — will retry on next page load");
+    return;
+  }
 
   // Push-forward: recurring tasks + OTO tasks with pushforward=yes
   const newPushFwd = [];
@@ -1852,11 +1883,9 @@ try {
   if (c) { permanentHistory = c.perm || {}; rawHistory = c.raw || []; }
 } catch(e) {}
 
-syncFromSheet();
+syncFromSheet(); // catch-up runs inside after first sync
 fetchHistory();
 fetchWeather();
-// Catch up any days where the tab was closed before 11:59 commit
-catchUpMissedCommits();
 setInterval(syncFromSheet, SYNC_MS);
 setInterval(fetchHistory, SYNC_MS);
 setInterval(fetchWeather, 15 * 60 * 1000);
