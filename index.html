@@ -943,7 +943,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.10.4 · pre-release</div>
+    <div id="version-tag">v0.10.5 · pre-release</div>
   </div>
   </div>
 
@@ -1832,10 +1832,11 @@ function render() {
       sortedOnce.forEach(task => {
         const isDone    = !!doneLog[task.id + "_" + todayKey];
         const isCustom  = customTasks.some(c => c.id === task.id);
-        const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey]) : null;
+        const _dk = task.id+"_"+todayKey;
+        const tempStamp = isDone ? "Last completed " + formatStamp(doneTs(_dk)||"", doneWho(_dk)||currentIdentity) : null;
         const permEntry = permanentHistory[task.id];
         const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
-          ? "Last completed " + formatStamp(permEntry.completedAt) : null;
+          ? "Last completed " + formatStamp(permEntry.completedAt, permEntry.who) : null;
         listEl.appendChild(buildTaskRow(task, true, isDone, isCustom, tempStamp || permStamp, false));
       });
     }
