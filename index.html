@@ -809,7 +809,7 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="version-tag">v0.9.2 · pre-release</div>
+  <div id="version-tag">v0.9.3 · pre-release</div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -1344,7 +1344,7 @@ async function catchUpMissedCommits() {
   if (currentView === 'history') renderHistory();
 }
 
-async function performCommit() {
+async function performCommit(_dateKey) {  // _dateKey unused — todayKey is global
   const allTasks = [...sheetTasks, ...customTasks];
   // Refresh from sheet first so we have all devices' completions
   await syncTodayState();
@@ -1484,6 +1484,7 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
 
   const wrap = document.createElement("div");
   wrap.className = "task-wrap";
+  wrap.dataset.taskId = task.id;
   const row = document.createElement("div");
   const isOverdue = !isDone && isOnce && task.targetDate && isOTOOverdue(task);
   row.className = "task-row"
@@ -1518,6 +1519,44 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
 }
 
 // ─── RENDER TODAY ─────────────────────────────────────────────────────────────
+// renderInPlace: updates check state visually without reordering tasks
+function renderInPlace() {
+  const allTasks   = [...sheetTasks, ...customTasks];
+  const todayTasks = allTasks.filter(t => isDueToday(t, today));
+  const total      = todayTasks.length;
+  const doneCount  = todayTasks.filter(t => doneLog[t.id + "_" + todayKey]).length;
+  const pct        = total === 0 ? 100 : Math.round((doneCount / total) * 100);
+  const remaining  = total - doneCount;
+
+  // Update each existing task row's visual state without rebuilding DOM
+  todayTasks.forEach(task => {
+    const isDone = !!doneLog[task.id + "_" + todayKey];
+    const wrap   = document.querySelector(`[data-task-id="${task.id}"]`);
+    if (!wrap) return;
+    const row = wrap.querySelector('.task-row');
+    const chk = wrap.querySelector('.task-checkbox');
+    const nm  = wrap.querySelector('.task-name');
+    const fr  = wrap.querySelector('.task-freq');
+    const em  = wrap.querySelector('.task-emoji');
+    if (!row) return;
+    if (isDone) {
+      row.classList.add('done');
+      if (task.type === 'once') { row.classList.remove('once'); }
+    } else {
+      row.classList.remove('done');
+      if (task.type === 'once') { row.classList.add('once'); }
+    }
+    const stampText = isDone ? 'Last completed ' + formatStamp(doneLog[task.id+'_'+todayKey]) : null;
+    const permEntry = permanentHistory[task.id];
+    const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
+      ? 'Last completed ' + formatStamp(permEntry.completedAt) : null;
+    if (fr) fr.textContent = stampText || permStamp || freqLabel(task);
+    if (fr) fr.className = 'task-freq' + (isDone ? ' stamped' : '');
+  });
+
+  updateRightColumn(pct, doneCount, total, remaining, todayTasks, todayKey);
+}
+
 function render() {
   const allTasks   = [...sheetTasks, ...customTasks];
   const todayTasks = allTasks.filter(t => isDueToday(t, today));
@@ -1543,8 +1582,7 @@ function render() {
       oHdr.className = "type-header once-header" + (allOnceDone ? " once-all-done" : "");
       oHdr.textContent = "ONE TIME ONLY";
       listEl.appendChild(oHdr);
-      [...allOnceTasks].sort((a,b) => !!doneLog[a.id+"_"+todayKey] - !!doneLog[b.id+"_"+todayKey])
-        .forEach(task => {
+      allOnceTasks.forEach(task => {
           const isDone    = !!doneLog[task.id + "_" + todayKey];
           const isCustom  = customTasks.some(c => c.id === task.id);
           const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey]) : null;
@@ -1570,8 +1608,7 @@ function render() {
         hdr.className = "section-header";
         hdr.innerHTML = `<div class="section-pip" style="background:${sec.accent}"></div><span class="section-label">${sec.label.toUpperCase()}</span><span class="section-count">${secDone}/${secTasks.length}</span>`;
         listEl.appendChild(hdr);
-        [...secTasks].sort((a,b) => !!doneLog[a.id+"_"+todayKey] - !!doneLog[b.id+"_"+todayKey])
-          .forEach(task => {
+        secTasks.forEach(task => {
             const isDone    = !!doneLog[task.id + "_" + todayKey];
             const isCustom  = customTasks.some(c => c.id === task.id);
             const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey]) : null;
@@ -2062,20 +2099,24 @@ function setRange(days, btn) {
   btn.classList.add("active");
   renderHistory();
 }
+let _reorderTimer = null;
 function toggleTask(id) {
   const key = id + "_" + todayKey;
   if (doneLog[key]) {
     delete doneLog[key];
     saveDone(doneLog);
-    render();
-    writeUncheckToSheet(id); // async — fire and forget
+    renderInPlace(); // re-render without reordering
+    writeUncheckToSheet(id);
   } else {
     const ts = new Date().toISOString();
     doneLog[key] = ts;
     saveDone(doneLog);
-    render();
-    writeCheckToSheet(id, ts); // async — fire and forget
+    renderInPlace(); // green instantly, stay in place
+    writeCheckToSheet(id, ts);
   }
+  // Reorder after a short delay — satisfying rather than jarring
+  clearTimeout(_reorderTimer);
+  _reorderTimer = setTimeout(() => render(), 1400);
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
