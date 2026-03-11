@@ -711,7 +711,7 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="version-tag">v0.8 · pre-release</div>
+  <div id="version-tag">v0.9 · pre-release</div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -1060,6 +1060,9 @@ async function syncFromSheet() {
   ensureOneTimeIds();
   render();
   // Run catch-up once after first successful sheet load
+  // Sync today's checked state from sheet (cross-device)
+  await syncTodayState();
+
   if (!_catchUpDone) {
     _catchUpDone = true;
     await catchUpMissedCommits();
@@ -1069,8 +1072,63 @@ async function syncFromSheet() {
 // ─── STATE ────────────────────────────────────────────────────────────────────
 function loadCustom()  { try { return JSON.parse(localStorage.getItem("hd_custom") || "[]"); } catch { return []; } }
 function saveCustom(t) { localStorage.setItem("hd_custom", JSON.stringify(t)); }
-function loadDone()    { try { return JSON.parse(localStorage.getItem("hd_done")   || "{}"); } catch { return {}; } }
-function saveDone(d)   { localStorage.setItem("hd_done", JSON.stringify(d)); }
+// ─── DONE LOG: sheet-backed, localStorage as instant-response cache ──────────
+// doneLog is the in-memory state. On check/uncheck we:
+//   1. Update doneLog immediately (instant visual)
+//   2. Write to localStorage cache (survives refresh)
+//   3. Fire async write to Today sheet (syncs all devices)
+// On load we:
+//   1. Seed from localStorage cache instantly
+//   2. Then fetch Today sheet and merge (truth wins over cache)
+
+function loadDone()  { try { return JSON.parse(localStorage.getItem("hd_done") || "{}"); } catch { return {}; } }
+function saveDone(d) {
+  // Only save today's entries to localStorage — prune old keys to keep it clean
+  const pruned = {};
+  Object.keys(d).forEach(k => { if (k.endsWith("_" + todayKey)) pruned[k] = d[k]; });
+  localStorage.setItem("hd_done", JSON.stringify(pruned));
+}
+
+// Fetch today's state from the Today sheet and merge into doneLog
+async function syncTodayState() {
+  try {
+    const res  = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "getTodayState", dateKey: todayKey })
+    });
+    const data = await res.json();
+    if (!data.ok || !data.entries) return;
+    let changed = false;
+    data.entries.forEach(entry => {
+      const key = entry.taskId + "_" + entry.dateKey;
+      if (!doneLog[key]) { doneLog[key] = entry.completedAt; changed = true; }
+    });
+    if (changed) { saveDone(doneLog); render(); }
+  } catch(err) { console.warn("syncTodayState failed:", err); }
+}
+
+// Write a single check to the Today sheet
+async function writeCheckToSheet(taskId, completedAt) {
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "checkTask", taskId, dateKey: todayKey, completedAt })
+    });
+  } catch(err) { console.warn("checkTask write failed:", err); }
+}
+
+// Remove a check from the Today sheet
+async function writeUncheckToSheet(taskId) {
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "uncheckTask", taskId, dateKey: todayKey })
+    });
+  } catch(err) { console.warn("uncheckTask write failed:", err); }
+}
 function loadPushFwd() { try { return JSON.parse(localStorage.getItem("hd_pushfwd") || "[]"); } catch { return []; } }
 function savePushFwd(p){ localStorage.setItem("hd_pushfwd", JSON.stringify(p)); }
 
@@ -1153,6 +1211,8 @@ async function catchUpMissedCommits() {
 
 async function performCommit() {
   const allTasks = [...sheetTasks, ...customTasks];
+  // Refresh from sheet first so we have all devices' completions
+  await syncTodayState();
   const entries  = [];
   Object.keys(doneLog).forEach(key => {
     if (key.endsWith("_" + todayKey)) {
@@ -1171,11 +1231,19 @@ async function performCommit() {
 
   const commitResult = await commitToHistory(entries, missedOTOs);
   if (!commitResult || !commitResult.ok) {
-    // Remove the committed flag so catchUp retries it next load
     localStorage.removeItem("hd_committed_" + todayKey);
     console.warn("Tonight commit failed — will retry on next page load");
     return;
   }
+
+  // Clear Today sheet now that data is in History
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ action: "clearToday", dateKey: todayKey })
+    });
+  } catch(err) { console.warn("clearToday failed:", err); }
 
   // Push-forward: recurring tasks + OTO tasks with pushforward=yes
   const newPushFwd = [];
@@ -1707,9 +1775,18 @@ function setRange(days, btn) {
 // ─── INTERACTIONS ─────────────────────────────────────────────────────────────
 function toggleTask(id) {
   const key = id + "_" + todayKey;
-  if (doneLog[key]) { delete doneLog[key]; }
-  else { doneLog[key] = new Date().toISOString(); }
-  saveDone(doneLog); render();
+  if (doneLog[key]) {
+    delete doneLog[key];
+    saveDone(doneLog);
+    render();
+    writeUncheckToSheet(id); // async — fire and forget
+  } else {
+    const ts = new Date().toISOString();
+    doneLog[key] = ts;
+    saveDone(doneLog);
+    render();
+    writeCheckToSheet(id, ts); // async — fire and forget
+  }
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
@@ -1887,6 +1964,7 @@ syncFromSheet(); // catch-up runs inside after first sync
 fetchHistory();
 fetchWeather();
 setInterval(syncFromSheet, SYNC_MS);
+setInterval(syncTodayState, 60 * 1000); // sync checked state every 60s
 setInterval(fetchHistory, SYNC_MS);
 setInterval(fetchWeather, 15 * 60 * 1000);
 setInterval(checkMidnightCommit, 60000);
