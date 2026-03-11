@@ -235,6 +235,11 @@
   .task-freq { font-size: 11px; color: #444; margin-top: 1px; }
   .task-row.done .task-freq { color: #2a3a2a; }
   .task-freq.stamped { color: #3a5a3a; font-style: italic; }
+  .carry-dot {
+    display: inline-block; width: 5px; height: 5px; border-radius: 99px;
+    background: #fb923c; opacity: 0.5; margin-right: 5px;
+    vertical-align: middle; position: relative; top: -1px; flex-shrink: 0;
+  }
   .task-row.once.done .task-freq.stamped { color: #3a5a3a; }
 
 
@@ -354,6 +359,27 @@
     letter-spacing: 1.5px; transition: all 0.2s; white-space: nowrap;
   }
   #edit-btn:hover { border-color: #333; color: #888; }
+
+  /* ── IDENTITY PICKER ── */
+  #identity-bar {
+    display: flex; gap: 8px; align-items: center;
+    margin-bottom: 0; padding-bottom: 16px;
+  }
+  #identity-label {
+    font-size: 9px; color: #2a2a2a; letter-spacing: 2px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .identity-btn {
+    background: none; border: 1px solid #1a1a1a; color: #2a2a2a;
+    border-radius: 99px; padding: 4px 14px; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
+    letter-spacing: 1.5px; transition: all 0.2s;
+  }
+  .identity-btn.active {
+    border-color: #4ade80; color: #4ade80;
+    background: rgba(74,222,128,0.06);
+  }
+  .identity-btn:hover:not(.active) { border-color: #333; color: #555; }
 
   /* ── ADD TASK MODAL OVERLAY ── */
   #task-modal-overlay {
@@ -751,10 +777,15 @@
     <!-- TODAY VIEW -->
     <div id="view-today">
       <div id="today-label" class="view-label">TODAY'S ACTIONS</div>
+      <div id="identity-bar">
+        <span id="identity-label">CHECKING IN AS</span>
+        <button class="identity-btn active" onclick="setIdentity('Jackson',this)">JACKSON</button>
+        <button class="identity-btn" onclick="setIdentity('Katelyn',this)">KATELYN</button>
+      </div>
       <div id="task-list">
         <div id="loading-state">Syncing with your task list…</div>
       </div>
-      <div id="empty-state">No further tasks scheduled for today.</div>
+      <div id="empty-state" style="padding:28px 0 8px;text-align:center"><div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:#1e1e1e;margin-bottom:8px">Nothing left today.</div><div style="font-size:11px;color:#1a1a1a;letter-spacing:1.5px">THE HOUSE IS IN ORDER</div></div>
 
 
     </div>
@@ -847,9 +878,7 @@
     <div id="view-history" style="display:none">
       <div class="view-label">HISTORY</div>
       <div id="history-range">
-        <button class="range-btn active" onclick="setRange(30,this)">30 DAYS</button>
-        <button class="range-btn" onclick="setRange(180,this)">180 DAYS</button>
-        <button class="range-btn" onclick="setRange(365,this)">1 YEAR</button>
+        <button class="range-btn active" onclick="setRange(365,this)">THIS YEAR</button>
         <button class="range-btn" onclick="setRange(99999,this)">ALL TIME</button>
       </div>
       <div id="history-content"></div>
@@ -1302,7 +1331,7 @@ async function writeCheckToSheet(taskId, completedAt) {
     await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ action: "checkTask", taskId, dateKey: todayKey, completedAt })
+      body: JSON.stringify({ action: "checkTask", taskId, dateKey: todayKey, completedAt, who: currentIdentity })
     });
   } catch(err) { console.warn("checkTask write failed:", err); }
   finally { _pendingWrites.delete(taskId); }
@@ -1330,9 +1359,28 @@ let rawHistory       = [];
 let rawOTOEvents     = [];
 let pushForwardList  = loadPushFwd();
 
+// ── Identity ──────────────────────────────────────────────────────────────────
+function loadIdentity() { return localStorage.getItem('hd_identity') || 'Jackson'; }
+function saveIdentity(name) { localStorage.setItem('hd_identity', name); }
+let currentIdentity = loadIdentity();
+
+function setIdentity(name, btn) {
+  currentIdentity = name;
+  saveIdentity(name);
+  document.querySelectorAll('.identity-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// Restore active identity button on load
+function restoreIdentityUI() {
+  document.querySelectorAll('.identity-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === currentIdentity.toUpperCase());
+  });
+}
+
 let currentView      = 'today';
 let selectedWeekDay  = 0; // index into weekDates array
-let historyRangeDays = 30;
+let historyRangeDays = 365;
 
 // Use Edmonton local time for all date calculations
 function getEdmontonDateKey(d) {
@@ -1385,7 +1433,7 @@ async function catchUpMissedCommits() {
       if (key.endsWith("_" + dk)) {
         const taskId = key.replace("_" + dk, "");
         const meta   = catchupMeta[taskId] || {};
-        entries.push({ taskId, completedAt: doneLog[key], dateKey: dk, name: meta.name, section: meta.section, emoji: meta.emoji });
+        entries.push({ taskId, completedAt: doneLog[key], dateKey: dk, name: meta.name, section: meta.section, emoji: meta.emoji, who: currentIdentity });
       }
     });
 
@@ -1552,13 +1600,16 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
     + (isOnce     ? " once"     : "")
     + (isOverdue  ? " overdue"  : "")
     + (isReadOnly ? " readonly" : "");
+  const isCarried = !isDone && pushForwardList.includes(task.id);
   row.innerHTML = `
     <div class="task-checkbox"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 3.5l3 3 5-5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <span class="task-emoji">${task.emoji}</span>
-    <div style="flex:1"><div class="task-name">${task.name}</div><div class="task-freq">${isOverdue ? "Due yesterday · overdue" : (stampText || freqLabel(task))}</div></div>
+    <div style="flex:1">
+      <div class="task-name">${isCarried ? '<span class="carry-dot"></span>' : ''}${task.name}</div>
+      <div class="task-freq">${isOverdue ? "Due yesterday · overdue" : (stampText || freqLabel(task))}</div>
+    </div>
     ${pillHTML}
     ${isOverdue ? '<span class="overdue-badge">OVERDUE</span>' : ''}
-
     ${hasNotes ? `<div class="task-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>` : ""}`;
 
   if (!isReadOnly) {
@@ -1659,10 +1710,6 @@ function render() {
     // ── 2. RECURRING — sections with incomplete tasks first, fully-done sections last ──
     const recurringTasks = todayTasks.filter(t => t.type !== 'once');
     if (recurringTasks.length > 0) {
-      const rHdr = document.createElement("div");
-      rHdr.className = "type-header";
-      rHdr.textContent = "RECURRING";
-      listEl.appendChild(rHdr);
 
       // Sort sections: any incomplete tasks → top; all complete → bottom
       const sortedSections = [...SECTIONS].sort((a, b) => {
@@ -1777,12 +1824,7 @@ function renderWeek() {
     // Recurring tasks grouped by section
     const anyRec = selRecurring.length > 0;
     if (anyRec) {
-      if (selOTO.length > 0) {
-        const rHdr = document.createElement("div");
-        rHdr.className = "type-header";
-        rHdr.textContent = "RECURRING";
-        detailEl.appendChild(rHdr);
-      }
+
       SECTIONS.forEach(sec => {
         const tasks = selRecurring.filter(t => t.section === sec.key);
         if (!tasks.length) return;
@@ -1852,24 +1894,24 @@ function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key) {
     svg.addEventListener("animationend", () => svg.classList.remove("pulse"), { once: true });
   } else if (pct < 100) { ringFill.dataset.wasFull = ""; }
 
-  // Motivate message
+  // Motivate message — specific, not platitudes
   const msgEl = document.getElementById("motivate-msg");
   const subEl = document.getElementById("motivate-sub");
   if (total === 0) {
-    msgEl.textContent = "All clear."; msgEl.style.color = "#333";
+    msgEl.textContent = "Rest easy."; msgEl.style.color = "#333";
     subEl.textContent = "Nothing scheduled today";
   } else if (pct === 100) {
-    msgEl.textContent = "Perfect day."; msgEl.style.color = "#4ade80";
-    subEl.textContent = "Everything done · " + doneCount + " tasks";
+    msgEl.textContent = "House in order."; msgEl.style.color = "#4ade80";
+    subEl.textContent = doneCount + " task" + (doneCount !== 1 ? "s" : "") + " complete";
   } else if (pct >= 60) {
-    msgEl.textContent = "Good progress."; msgEl.style.color = rc;
-    subEl.textContent = remaining + " remaining · " + doneCount + " done";
+    msgEl.textContent = "Almost there."; msgEl.style.color = rc;
+    subEl.textContent = remaining + " left";
   } else if (pct > 0) {
-    msgEl.textContent = "Getting there."; msgEl.style.color = rc;
-    subEl.textContent = remaining + " remaining · " + doneCount + " done";
+    msgEl.textContent = "Underway."; msgEl.style.color = rc;
+    subEl.textContent = doneCount + " done · " + remaining + " remaining";
   } else {
-    msgEl.textContent = "Fresh start."; msgEl.style.color = "#f87171";
-    subEl.textContent = total + " tasks today";
+    msgEl.textContent = "Ready."; msgEl.style.color = "#f87171";
+    subEl.textContent = total + " task" + (total !== 1 ? "s" : "") + " today";
   }
 
   // Stats
@@ -1950,7 +1992,7 @@ function renderHistory() {
   const uniqueDays = new Set(filtered.map(e => e.dateKey)).size;
   const totalDone  = filtered.length;
   const avgPerDay  = uniqueDays > 0 ? (totalDone / uniqueDays).toFixed(1) : "0";
-  const rangeLabel = historyRangeDays >= 99999 ? "all time" : "last " + historyRangeDays + " days";
+  const rangeLabel = historyRangeDays >= 99999 ? "all time" : historyRangeDays === 365 ? "this year" : "last " + historyRangeDays + " days";
 
   // ── Best week ─────────────────────────────────────────────────────────────
   // Group rawHistory by ISO week (Mon-Sun)
@@ -2456,6 +2498,7 @@ try {
 } catch(e) {}
 
 syncFromSheet(); // catch-up runs inside after first sync
+restoreIdentityUI(); // restore identity button state
 syncTodayState(); // immediate cross-device state sync on load
 fetchHistory();
 fetchWeather();
