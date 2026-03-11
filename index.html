@@ -1970,6 +1970,25 @@ function updateHistoryRightColumn(allTimeDone, streak, longestStreak, avgPerDay)
 }
 
 // ─── INTERACTIONS ─────────────────────────────────────────────────────────────
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  const activeBtn = document.querySelector('.nav-btn[onclick="switchView(\''+view+'\')"]');
+  if (activeBtn) activeBtn.classList.add("active");
+  document.getElementById("view-today").style.display   = view === 'today'   ? 'block' : 'none';
+  document.getElementById("view-week").style.display    = view === 'week'    ? 'block' : 'none';
+  document.getElementById("view-history").style.display = view === 'history' ? 'block' : 'none';
+  document.getElementById("edit-btn").style.display     = view === 'today'   ? 'block' : 'none';
+  if (view === 'today')   render();
+  if (view === 'week')    renderWeek();
+  if (view === 'history') renderHistory();
+}
+function setRange(days, btn) {
+  historyRangeDays = days;
+  document.querySelectorAll(".range-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderHistory();
+}
 function toggleTask(id) {
   const key = id + "_" + todayKey;
   if (doneLog[key]) {
