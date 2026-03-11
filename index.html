@@ -127,15 +127,7 @@
     background: linear-gradient(90deg, transparent, #333, transparent);
     margin-top: 10px;
   }
-  #checkin-indicator {
-    margin-top: 10px; font-size: 9px; letter-spacing: 2px;
-    font-family: 'Outfit', sans-serif; font-weight: 600;
-    color: #1e1e1e; transition: color 0.4s;
-    min-height: 13px;
-  }
-  #checkin-indicator.jackson { color: rgba(74,222,128,0.5); }
-  #checkin-indicator.katelyn { color: rgba(168,85,247,0.5); }
-  #checkin-indicator.family  { color: #222; }
+
 
   /* ── GREETING ── */
   #greeting-wrap {
@@ -243,7 +235,7 @@
   .task-row.done .task-name { color: #2a2a2a; text-decoration: line-through; }
   .task-freq { font-size: 11px; color: #444; margin-top: 1px; }
   .task-row.done .task-freq { color: #2a3a2a; }
-  .task-freq.stamped { color: #3a5a3a; font-style: italic; }
+  .task-freq.stamped { color: #3a5a3a; }
   .carry-dot {
     display: inline-block; width: 5px; height: 5px; border-radius: 99px;
     background: #fb923c; opacity: 0.5; margin-right: 5px;
@@ -349,8 +341,20 @@
   #empty-state { color: #333; font-size: 13px; font-style: italic; margin-top: 8px; display: none; }
 
   /* ── VERSION WATERMARK ── */
-  #version-tag {
+  #left-footer {
+    display: flex; justify-content: space-between; align-items: flex-end;
     margin-top: auto; padding-top: 32px;
+  }
+  #checkin-indicator {
+    font-size: 9px; letter-spacing: 1.5px;
+    font-family: 'Outfit', sans-serif; font-weight: 600;
+    color: #222; user-select: none; line-height: 1;
+  }
+  #checkin-indicator .checkin-prefix { color: #222; }
+  #checkin-indicator .checkin-name   { transition: color 0.4s; }
+  #checkin-indicator .checkin-name.jackson { color: rgba(74,222,128,0.6); }
+  #checkin-indicator .checkin-name.katelyn { color: rgba(168,85,247,0.6); }
+  #version-tag {
     font-size: 9px; color: #1e1e1e;
     letter-spacing: 1.5px; font-family: 'Outfit', sans-serif;
     text-align: right; user-select: none;
@@ -937,7 +941,10 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="version-tag">v0.9.6 · pre-release</div>
+  <div id="left-footer">
+    <div id="checkin-indicator"></div>
+    <div id="version-tag">v0.10.4 · pre-release</div>
+  </div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -950,7 +957,6 @@
         <div id="brand-copy">©</div>
       </div>
       <div id="brand-rule"></div>
-      <div id="checkin-indicator"></div>
     </div>
     <div id="right-main">
     <div id="greeting-wrap">
@@ -1346,16 +1352,20 @@ async function syncTodayState() {
     let changed = false;
 
     // ADD: entries in sheet but not in local doneLog
-    data.entries.forEach(entry => {
-      const taskId      = String(entry.taskId  || '').trim();
-      const dkStr       = String(entry.dateKey || '').trim();
-      const resolvedKey = dkStr.length === 10 ? dkStr : todayKey;
-      const key         = taskId + "_" + resolvedKey;
-      if (taskId && resolvedKey === todayKey && !doneLog[key]) {
-        doneLog[key] = entry.completedAt ? String(entry.completedAt) : new Date().toISOString();
-        changed = true;
-      }
-    });
+    // Guard: skip if taskId has a pending write OR within quiet window (user may have just unchecked)
+    const sinceLastToggleAdd = Date.now() - (_lastToggleTime || 0);
+    if (sinceLastToggleAdd > 5000) {
+      data.entries.forEach(entry => {
+        const taskId      = String(entry.taskId  || '').trim();
+        const dkStr       = String(entry.dateKey || '').trim();
+        const resolvedKey = dkStr.length === 10 ? dkStr : todayKey;
+        const key         = taskId + "_" + resolvedKey;
+        if (taskId && resolvedKey === todayKey && !doneLog[key] && !_pendingWrites.has(taskId)) {
+          doneLog[key] = { ts: entry.completedAt ? String(entry.completedAt) : new Date().toISOString(), who: entry.who || '' };
+          changed = true;
+        }
+      });
+    }
 
     // REMOVE: entries in local doneLog for today that are no longer in sheet
     // Guard 1: skip taskIds currently being written (in-flight protection)
@@ -1451,10 +1461,10 @@ function updateCheckinIndicator(name) {
   const el = document.getElementById('checkin-indicator');
   if (!el) return;
   if (!name || name === 'The Stewart Family') {
-    el.textContent = ''; el.className = 'family';
+    el.innerHTML = '';
   } else {
-    el.textContent = name.toUpperCase();
-    el.className = name === 'Katelyn' ? 'katelyn' : 'jackson';
+    const cls = name === 'Katelyn' ? 'katelyn' : 'jackson';
+    el.innerHTML = `<span class="checkin-prefix">checked in as </span><span class="checkin-name ${cls}">${name}</span>`;
   }
 }
 
@@ -1504,6 +1514,16 @@ const today    = new Date(todayKey + 'T00:00:00'); // midnight local
 const weekDates = Array.from({length:7}, (_,i) => addDays(today, i+1));
 
 // ─── FORMAT HELPERS ───────────────────────────────────────────────────────────
+// doneLog entries are {ts, who} objects; legacy entries may be plain ISO strings
+function doneEntry(key) {
+  const v = doneLog[key];
+  if (!v) return null;
+  if (typeof v === 'string') return { ts: v, who: '' };
+  return v;
+}
+function doneTs(key)  { const e = doneEntry(key); return e ? e.ts  : null; }
+function doneWho(key) { const e = doneEntry(key); return e ? e.who : ''; }
+
 function formatStamp(isoString, who) {
   const d = new Date(isoString);
   const h = d.getHours() % 12 || 12;
@@ -1545,7 +1565,8 @@ async function catchUpMissedCommits() {
       if (key.endsWith("_" + dk)) {
         const taskId = key.replace("_" + dk, "");
         const meta   = catchupMeta[taskId] || {};
-        entries.push({ taskId, completedAt: doneLog[key], dateKey: dk, name: meta.name, section: meta.section, emoji: meta.emoji, who: currentIdentity });
+        const _ce = doneEntry(key);
+        entries.push({ taskId, completedAt: _ce ? _ce.ts : new Date().toISOString(), dateKey: dk, name: meta.name, section: meta.section, emoji: meta.emoji, who: _ce && _ce.who ? _ce.who : currentIdentity });
       }
     });
 
@@ -1768,7 +1789,7 @@ function renderInPlace() {
       row.classList.remove('done');
       if (task.type === 'once') { row.classList.add('once'); }
     }
-    const stampText = isDone ? 'Last completed ' + formatStamp(doneLog[task.id+'_'+todayKey], currentIdentity) : null;
+    const _dki = task.id+'_'+todayKey; const stampText = isDone ? 'Last completed ' + formatStamp(doneTs(_dki)||'', doneWho(_dki)||currentIdentity) : null;
     const permEntry = permanentHistory[task.id];
     const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
       ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
@@ -1855,7 +1876,7 @@ function render() {
         sortedSec.forEach(task => {
           const isDone    = !!doneLog[task.id + "_" + todayKey];
           const isCustom  = customTasks.some(c => c.id === task.id);
-          const tempStamp = isDone ? "Last completed " + formatStamp(doneLog[task.id+"_"+todayKey], currentIdentity) : null;
+          const _dk = task.id+"_"+todayKey; const tempStamp = isDone ? "Last completed " + formatStamp(doneTs(_dk)||"", doneWho(_dk)||currentIdentity) : null;
           const permEntry = permanentHistory[task.id];
           const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
             ? "Last completed " + formatStamp(permEntry.completedAt, permEntry.who) : null;
@@ -2433,8 +2454,8 @@ function toggleTask(id) {
     renderInPlace(); // re-render without reordering
     writeUncheckToSheet(id);
   } else {
-    const ts = new Date().toISOString();
-    doneLog[key] = ts;
+    const ts  = new Date().toISOString();
+    doneLog[key] = { ts, who: currentIdentity };
     saveDone(doneLog);
     renderInPlace(); // green instantly, stay in place
     writeCheckToSheet(id, ts);
