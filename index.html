@@ -1236,15 +1236,17 @@ async function catchUpMissedCommits() {
     const committed = localStorage.getItem("hd_committed_" + dk);
     if (committed) continue; // already committed
 
-    // Find any done entries for this day
+    // Find any done entries for this day — snapshot name/section/emoji for future-proof history
+    const catchupMeta = {};
+    [...sheetTasks, ...customTasks].forEach(t => {
+      catchupMeta[t.id] = { name: t.name||'', section: t.section||'', emoji: t.emoji||'' };
+    });
     const entries = [];
     Object.keys(doneLog).forEach(key => {
       if (key.endsWith("_" + dk)) {
-        entries.push({
-          taskId:      key.replace("_" + dk, ""),
-          completedAt: doneLog[key],
-          dateKey:     dk
-        });
+        const taskId = key.replace("_" + dk, "");
+        const meta   = catchupMeta[taskId] || {};
+        entries.push({ taskId, completedAt: doneLog[key], dateKey: dk, name: meta.name, section: meta.section, emoji: meta.emoji });
       }
     });
 
@@ -1267,9 +1269,15 @@ async function performCommit() {
   // Refresh from sheet first so we have all devices' completions
   await syncTodayState();
   const entries  = [];
+  // Build taskId → meta lookup for snapshot
+  const taskMetaMap = {};
+  allTasks.forEach(t => { taskMetaMap[t.id] = { name: t.name, section: t.section, emoji: t.emoji }; });
+
   Object.keys(doneLog).forEach(key => {
     if (key.endsWith("_" + todayKey)) {
-      entries.push({ taskId: key.replace("_" + todayKey, ""), completedAt: doneLog[key], dateKey: todayKey });
+      const taskId = key.replace("_" + todayKey, "");
+      const meta   = taskMetaMap[taskId] || {};
+      entries.push({ taskId, completedAt: doneLog[key], dateKey: todayKey, name: meta.name||'', section: meta.section||'', emoji: meta.emoji||'' });
     }
   });
 
