@@ -316,6 +316,16 @@
   .view-label { font-size: 11px; color: #444; letter-spacing: 2.5px; margin-bottom: 20px; font-weight: 600; }
 
   #empty-state { color: #333; font-size: 13px; font-style: italic; margin-top: 8px; display: none; }
+
+  /* ── VERSION WATERMARK ── */
+  #version-tag {
+    margin-top: auto; padding-top: 32px;
+    font-size: 9px; color: #1e1e1e;
+    letter-spacing: 1.5px; font-family: 'Outfit', sans-serif;
+    text-align: right; user-select: none;
+    transition: color 0.3s;
+  }
+  #version-tag:hover { color: #333; }
   #loading-state { color: #1e1e1e; font-size: 13px; font-style: italic; margin-top: 8px; }
 
   /* ── EDIT BUTTON ── */
@@ -516,6 +526,7 @@
   .stat-lbl { font-size: 9px; color: #444; letter-spacing: 2px; margin-top: 5px; }
 
   #sec-bars { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+  .bar-row { width: 100%; }
   .bar-meta { display: flex; justify-content: space-between; margin-bottom: 5px; }
   .bar-name { font-size: 10px; color: #555; letter-spacing: 1.5px; }
   .bar-count { font-size: 10px; color: #444; }
@@ -700,6 +711,7 @@
       </div>
       <div id="history-content"></div>
     </div>
+  <div id="version-tag">v0.8 · pre-release</div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -1076,10 +1088,42 @@ function checkMidnightCommit() {
     const committed = localStorage.getItem("hd_committed_" + todayKey);
     if (!committed) {
       localStorage.setItem("hd_committed_" + todayKey, "1");
-      performCommit();
+      performCommit(todayKey);
     }
   }
   if (now.getHours() === 0 && now.getMinutes() === 0) location.reload();
+}
+
+// On load: check if any recent days were never committed and catch up
+async function catchUpMissedCommits() {
+  // Check up to 7 days back for uncommitted days that have done entries
+  for (let i = 1; i <= 7; i++) {
+    const d    = addDays(today, -i);
+    const dk   = dateKey(d);
+    const committed = localStorage.getItem("hd_committed_" + dk);
+    if (committed) continue; // already committed
+
+    // Find any done entries for this day
+    const entries = [];
+    Object.keys(doneLog).forEach(key => {
+      if (key.endsWith("_" + dk)) {
+        entries.push({
+          taskId:      key.replace("_" + dk, ""),
+          completedAt: doneLog[key],
+          dateKey:     dk
+        });
+      }
+    });
+
+    if (entries.length > 0) {
+      console.log("Catching up missed commit for", dk, entries.length, "entries");
+      localStorage.setItem("hd_committed_" + dk, "1");
+      await commitToHistory(entries, []); // no missed OTO detection for old days
+    }
+  }
+  // Refresh history display after catch-up
+  await fetchHistory();
+  if (currentView === 'history') renderHistory();
 }
 
 async function performCommit() {
@@ -1203,7 +1247,7 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
     <div style="flex:1"><div class="task-name">${task.name}</div><div class="task-freq">${isOverdue ? "Due yesterday · overdue" : (stampText || freqLabel(task))}</div></div>
     ${pillHTML}
     ${isOverdue ? '<span class="overdue-badge">OVERDUE</span>' : ''}
-    ${isCustom && !isReadOnly ? `<button class="task-remove" onclick="removeTask('${task.id}',event)">\u2715</button>` : ""}
+
     ${hasNotes ? `<div class="task-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>` : ""}`;
 
   if (!isReadOnly) {
@@ -1811,6 +1855,8 @@ try {
 syncFromSheet();
 fetchHistory();
 fetchWeather();
+// Catch up any days where the tab was closed before 11:59 commit
+catchUpMissedCommits();
 setInterval(syncFromSheet, SYNC_MS);
 setInterval(fetchHistory, SYNC_MS);
 setInterval(fetchWeather, 15 * 60 * 1000);
