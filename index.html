@@ -14,6 +14,23 @@
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 99px; }
 
+  /* ── OFFLINE BANNER ── */
+  #offline-banner {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 200;
+    background: #1a0a0a;
+    border-bottom: 1px solid rgba(239,68,68,0.3);
+    padding: 8px 20px;
+    text-align: center;
+    font-family: 'Outfit', sans-serif;
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 2px; color: #ef4444;
+  }
+  #offline-banner.visible { display: block; }
+  /* Push top-bar down when banner is visible */
+  #offline-banner.visible ~ #top-bar { top: 33px; }
+
   /* ── TOP PROGRESS BAR ── */
   #top-bar {
     position: fixed; top: 0; left: 0; right: 0;
@@ -569,6 +586,7 @@
 </style>
 </head>
 <body>
+<div id="offline-banner">⚠ NO CONNECTION — changes will not be saved until you're back online</div>
 <div id="top-bar"><div id="top-bar-fill"></div></div>
 <div id="app">
 
@@ -711,7 +729,7 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="version-tag">v0.9 · pre-release</div>
+  <div id="version-tag">v0.9.1 · pre-release</div>
   </div>
 
   <!-- RIGHT COLUMN -->
@@ -1257,6 +1275,17 @@ async function performCommit() {
 }
 
 // ─── CLOCK ────────────────────────────────────────────────────────────────────
+// ─── OFFLINE DETECTION ───────────────────────────────────────────────────────
+function setOffline(isOffline) {
+  const banner = document.getElementById('offline-banner');
+  if (isOffline) banner.classList.add('visible');
+  else           banner.classList.remove('visible');
+}
+window.addEventListener('online',  () => setOffline(false));
+window.addEventListener('offline', () => setOffline(true));
+// Check on load too
+if (!navigator.onLine) setOffline(true);
+
 // ─── AMBIENT BG ───────────────────────────────────────────────────────────────
 function getSeasonalTint() {
   const m = new Date().getMonth(); // 0-11
