@@ -1101,9 +1101,15 @@ function saveCustom(t) { localStorage.setItem("hd_custom", JSON.stringify(t)); }
 
 function loadDone()  { try { return JSON.parse(localStorage.getItem("hd_done") || "{}"); } catch { return {}; } }
 function saveDone(d) {
-  // Only save today's entries to localStorage — prune old keys to keep it clean
+  // Keep up to 14 days of entries so catchUpMissedCommits can recover them
+  // Only prune keys older than 14 days
+  const cutoff = dateKey(addDays(today, -14));
   const pruned = {};
-  Object.keys(d).forEach(k => { if (k.endsWith("_" + todayKey)) pruned[k] = d[k]; });
+  Object.keys(d).forEach(k => {
+    const parts = k.split('_');
+    const dk    = parts[parts.length - 1]; // last segment is YYYY-MM-DD
+    if (dk >= cutoff) pruned[k] = d[k];
+  });
   localStorage.setItem("hd_done", JSON.stringify(pruned));
 }
 
