@@ -1119,8 +1119,16 @@ async function syncTodayState() {
     if (!data.ok || !data.entries) return;
     let changed = false;
     data.entries.forEach(entry => {
-      const key = entry.taskId + "_" + entry.dateKey;
-      if (!doneLog[key]) { doneLog[key] = entry.completedAt; changed = true; }
+      // Coerce all values to strings — Sheets can return Date objects or numbers
+      const taskId  = String(entry.taskId  || '').trim();
+      const dkStr   = String(entry.dateKey || '').trim();
+      // dateKey from sheet might be a Date object serialized oddly — re-derive from completedAt if needed
+      const resolvedDateKey = dkStr.length === 10 ? dkStr : todayKey;
+      const key = taskId + "_" + resolvedDateKey;
+      if (taskId && resolvedDateKey === todayKey && !doneLog[key]) {
+        doneLog[key] = entry.completedAt ? String(entry.completedAt) : new Date().toISOString();
+        changed = true;
+      }
     });
     if (changed) { saveDone(doneLog); render(); }
   } catch(err) { console.warn("syncTodayState failed:", err); }
@@ -1990,10 +1998,11 @@ try {
 } catch(e) {}
 
 syncFromSheet(); // catch-up runs inside after first sync
+syncTodayState(); // immediate cross-device state sync on load
 fetchHistory();
 fetchWeather();
 setInterval(syncFromSheet, SYNC_MS);
-setInterval(syncTodayState, 60 * 1000); // sync checked state every 60s
+setInterval(syncTodayState, 15 * 1000); // sync checked state every 15s
 setInterval(fetchHistory, SYNC_MS);
 setInterval(fetchWeather, 15 * 60 * 1000);
 setInterval(checkMidnightCommit, 60000);
