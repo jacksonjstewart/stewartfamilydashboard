@@ -10,9 +10,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: #0a0a0a; height: 100%; font-family: 'Outfit', sans-serif; color: #e8e8e8; }
+  html, body { background: var(--bg, #0a0a0a); height: 100%; font-family: 'Outfit', sans-serif; color: #e8e8e8; transition: background 8s ease; }
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 99px; }
+
+  /* ── TOP PROGRESS BAR ── */
+  #top-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 2px; z-index: 50; background: transparent;
+  }
+  #top-bar-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #4ade80, #a3e635);
+    transition: width 1s cubic-bezier(0.4,0,0.2,1), background 0.4s;
+    border-radius: 0 2px 2px 0;
+  }
 
   #app {
     min-height: 100vh;
@@ -35,10 +47,34 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #0d0d0d;
+    background: var(--bg-right, #0d0d0d);
     position: sticky;
     top: 0;
     height: 100vh;
+    transition: background 8s ease;
+  }
+
+  /* ── FAMILY BRAND ── */
+  #family-brand {
+    text-align: center; margin-bottom: 20px;
+  }
+  #family-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 300; color: #555;
+    letter-spacing: 1px; line-height: 1;
+  }
+  #family-sub {
+    font-size: 9px; color: #2a2a2a; letter-spacing: 3px;
+    margin-top: 4px; font-family: 'Outfit', sans-serif;
+  }
+
+  /* ── GREETING ── */
+  #greeting-wrap {
+    text-align: center; margin-bottom: 16px; min-height: 18px;
+  }
+  #greeting-text {
+    font-size: 10px; color: #333; letter-spacing: 2px;
+    font-family: 'Outfit', sans-serif; font-weight: 400;
   }
 
   /* ── CLOCK ── */
@@ -180,10 +216,10 @@
   }
 
   /* ── ONE-TIME TASK ── */
-  .task-row.once { background: rgba(180,30,30,0.06); border-color: rgba(180,30,30,0.15); }
-  .task-row.once .task-name { color: #c97070; }
-  .task-row.once .task-freq { color: #6b3a3a; }
-  .task-row.once .task-checkbox { border-color: #4a2020; }
+  .task-row.once { background: rgba(180,150,20,0.06); border-color: rgba(180,150,20,0.18); }
+  .task-row.once .task-name { color: #c9a84c; }
+  .task-row.once .task-freq { color: #7a6020; }
+  .task-row.once .task-checkbox { border-color: #5a4a10; }
   .task-row.once.done { background: rgba(74,222,128,0.04); border-color: rgba(74,222,128,0.12); }
   .task-row.once.done .task-name { color: #2a2a2a; text-decoration: line-through; }
   .task-row.once.done .task-freq { color: #2a3a2a; }
@@ -197,8 +233,8 @@
     display: flex; align-items: center; gap: 10px;
   }
   .type-header::after { content: ''; flex: 1; height: 1px; background: #161616; }
-  .type-header.once-header { color: #4a2020; }
-  .type-header.once-header::after { background: #2a1010; }
+  .type-header.once-header { color: #6a5010; }
+  .type-header.once-header::after { background: #2a2008; }
   .type-header.once-header.once-all-done { color: #4ade80; }
   .type-header.once-header.once-all-done::after { background: #1a3a1a; }
 
@@ -268,6 +304,13 @@
     from { transform: translateY(100%); opacity: 0; }
     to   { transform: translateY(0);    opacity: 1; }
   }
+  @keyframes ringPulse {
+    0%   { transform: rotate(-90deg) scale(1);    opacity: 1; }
+    40%  { transform: rotate(-90deg) scale(1.04); opacity: 0.85; }
+    70%  { transform: rotate(-90deg) scale(0.98); opacity: 1; }
+    100% { transform: rotate(-90deg) scale(1);    opacity: 1; }
+  }
+  #ring-wrap svg.pulse { animation: ringPulse 0.8s cubic-bezier(0.4,0,0.2,1); }
 
   .modal-header {
     display: flex; justify-content: space-between; align-items: center;
@@ -472,6 +515,7 @@
 </style>
 </head>
 <body>
+<div id="top-bar"><div id="top-bar-fill"></div></div>
 <div id="app">
 
   <div id="left">
@@ -509,7 +553,7 @@
 
     <!-- TODAY VIEW -->
     <div id="view-today">
-      <div class="view-label">TODAY'S ACTIONS</div>
+      <div id="today-label" class="view-label">TODAY'S ACTIONS</div>
       <div id="task-list">
         <div id="loading-state">Syncing with your task list…</div>
       </div>
@@ -553,14 +597,8 @@
         </div>
 
         <div id="modal-date-field" class="modal-field" style="display:none">
-          <div class="modal-label">TARGET DATE <span style="color:#333;font-weight:400;letter-spacing:0">— optional, leave blank to show daily</span></div>
+          <div class="modal-label">TARGET DATE <span style="color:#333;font-weight:400;letter-spacing:0">— leave blank to show daily until done</span></div>
           <input id="m-targetdate" class="modal-input" type="date" style="color-scheme:dark"/>
-        </div>
-
-        <div id="modal-date-field" class="modal-field" style="display:none">
-          <div class="modal-label">TARGET DATE</div>
-          <input id="m-targetdate" class="modal-input" type="date"/>
-          <div style="font-size:10px;color:#333;margin-top:4px;letter-spacing:1px">Leave blank to show every day until completed</div>
         </div>
 
         <div id="modal-freq-opts" class="visible">
@@ -623,6 +661,13 @@
 
   <!-- RIGHT COLUMN -->
   <div id="right">
+    <div id="family-brand">
+      <div id="family-name">The Stewart Family</div>
+      <div id="family-sub">© 2026</div>
+    </div>
+    <div id="greeting-wrap">
+      <div id="greeting-text"></div>
+    </div>
     <div id="ring-wrap">
       <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
         <circle cx="110" cy="110" r="100" fill="none" stroke="#1a1a1a" stroke-width="13"/>
@@ -1019,12 +1064,56 @@ async function performCommit() {
 }
 
 // ─── CLOCK ────────────────────────────────────────────────────────────────────
+// ─── AMBIENT BG ───────────────────────────────────────────────────────────────
+function getSeasonalTint() {
+  const m = new Date().getMonth(); // 0-11
+  // Winter: deep blue-black, Spring: faint green, Summer: faint warm, Fall: faint amber
+  if (m >= 2 && m <= 4)  return { bg: '10,10,11',   bgr: '13,13,14'  }; // Spring: barely green
+  if (m >= 5 && m <= 7)  return { bg: '10,10,9',    bgr: '13,13,11'  }; // Summer: barely warm
+  if (m >= 8 && m <= 10) return { bg: '11,10,9',    bgr: '14,13,11'  }; // Fall: barely amber
+  return                         { bg: '9,9,11',     bgr: '11,11,14'  }; // Winter: barely blue
+}
+function updateAmbientBg() {
+  const hour = new Date().getHours();
+  const tint = getSeasonalTint();
+  // Brightness: deepest 0-5am, lifts 6-9am, bright 10am-4pm, dims 5-8pm, deep 9pm+
+  let alpha;
+  if      (hour >= 6  && hour <= 9)  alpha = 0.92;
+  else if (hour >= 10 && hour <= 16) alpha = 0.88;
+  else if (hour >= 17 && hour <= 20) alpha = 0.93;
+  else                               alpha = 0.97;
+  const base = Math.round(10 * alpha);
+  document.documentElement.style.setProperty('--bg',       `rgb(${tint.bg})`);
+  document.documentElement.style.setProperty('--bg-right', `rgb(${tint.bgr})`);
+}
+
+// ─── GREETING ─────────────────────────────────────────────────────────────────
+function updateGreeting() {
+  const h = new Date().getHours();
+  let text;
+  if      (h >= 5  && h < 12) text = "GOOD MORNING";
+  else if (h >= 12 && h < 17) text = "GOOD AFTERNOON";
+  else if (h >= 17 && h < 21) text = "GOOD EVENING";
+  else                         text = "GOOD NIGHT";
+  document.getElementById("greeting-text").textContent = text;
+  // Also update today label
+  const lbl = document.getElementById("today-label");
+  if (lbl) {
+    if      (h >= 5  && h < 12) lbl.textContent = "THIS MORNING'S ACTIONS";
+    else if (h >= 12 && h < 17) lbl.textContent = "THIS AFTERNOON'S ACTIONS";
+    else if (h >= 17 && h < 21) lbl.textContent = "THIS EVENING'S ACTIONS";
+    else                         lbl.textContent = "TODAY'S ACTIONS";
+  }
+}
+
 function updateClock() {
   const now = new Date();
   const h = now.getHours() % 12 || 12, m = String(now.getMinutes()).padStart(2,"0");
   document.getElementById("clock-day").textContent  = DAYS[now.getDay()];
   document.getElementById("clock-date").textContent = MONTHS[now.getMonth()] + " " + now.getDate() + ", " + now.getFullYear();
   document.getElementById("clock-time").innerHTML   = h + ":" + m + "<span>" + (now.getHours()>=12?"pm":"am") + "</span>";
+  updateAmbientBg();
+  updateGreeting();
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -1156,13 +1245,19 @@ function render() {
 
 // ─── RENDER WEEK ──────────────────────────────────────────────────────────────
 function renderWeek() {
-  const allTasks = [...sheetTasks, ...customTasks].filter(t => t.type !== 'once');
+  const allTasks = [...sheetTasks, ...customTasks].filter(t => t.type !== 'once' && t.freq !== 'once');
   const stripEl  = document.getElementById("week-strip");
   const detailEl = document.getElementById("week-detail");
   stripEl.innerHTML = "";
 
+  // Include OTO tasks with a targetDate that falls on this week's dates
+  const otoTasks = [...sheetTasks, ...customTasks].filter(t => t.type === 'once' && t.targetDate);
+
   weekDates.forEach((d, i) => {
-    const tasks = allTasks.filter(t => isDueOn(t, d));
+    const dk = dateKey(d);
+    const recurringTasks = allTasks.filter(t => isDueOn(t, d));
+    const otoOnDay = otoTasks.filter(t => t.targetDate === dk);
+    const tasks = [...recurringTasks, ...otoOnDay];
     const count = tasks.length;
     const isSelected = i === selectedWeekDay;
 
@@ -1186,7 +1281,10 @@ function renderWeek() {
 
   // Detail panel for selected day
   const selDate  = weekDates[selectedWeekDay];
-  const selTasks = allTasks.filter(t => isDueOn(t, selDate));
+  const selDk = dateKey(selDate);
+  const selRecurring = allTasks.filter(t => isDueOn(t, selDate));
+  const selOTO = otoTasks.filter(t => t.targetDate === selDk);
+  const selTasks = [...selRecurring, ...selOTO];
   detailEl.innerHTML = "";
 
   const dayHdr = document.createElement("div");
@@ -1205,17 +1303,37 @@ function renderWeek() {
     empty.textContent = "Nothing scheduled — a free day.";
     detailEl.appendChild(empty);
   } else {
-    SECTIONS.forEach(sec => {
-      const tasks = selTasks.filter(t => t.section === sec.key);
-      if (!tasks.length) return;
-      const hdr = document.createElement("div");
-      hdr.className = "section-header";
-      hdr.innerHTML = `<div class="section-pip" style="background:${sec.accent}"></div><span class="section-label">${sec.label.toUpperCase()}</span><span class="section-count">${tasks.length}</span>`;
-      detailEl.appendChild(hdr);
-      tasks.forEach(task => {
-        detailEl.appendChild(buildTaskRow(task, false, false, false, null, true));
+    // OTO tasks for this day
+    if (selOTO.length > 0) {
+      const oHdr = document.createElement("div");
+      oHdr.className = "type-header once-header";
+      oHdr.textContent = "ONE TIME ONLY";
+      detailEl.appendChild(oHdr);
+      selOTO.forEach(task => {
+        detailEl.appendChild(buildTaskRow(task, true, false, false, null, true));
       });
-    });
+    }
+    // Recurring tasks grouped by section
+    const anyRec = selRecurring.length > 0;
+    if (anyRec) {
+      if (selOTO.length > 0) {
+        const rHdr = document.createElement("div");
+        rHdr.className = "type-header";
+        rHdr.textContent = "RECURRING";
+        detailEl.appendChild(rHdr);
+      }
+      SECTIONS.forEach(sec => {
+        const tasks = selRecurring.filter(t => t.section === sec.key);
+        if (!tasks.length) return;
+        const hdr = document.createElement("div");
+        hdr.className = "section-header";
+        hdr.innerHTML = `<div class="section-pip" style="background:${sec.accent}"></div><span class="section-label">${sec.label.toUpperCase()}</span><span class="section-count">${tasks.length}</span>`;
+        detailEl.appendChild(hdr);
+        tasks.forEach(task => {
+          detailEl.appendChild(buildTaskRow(task, false, false, false, null, true));
+        });
+      });
+    }
   }
 
   // Right column: week stats
@@ -1296,7 +1414,7 @@ function renderHistory() {
   }
 
   // Overall completion rate (approximate: done vs total tasks per day)
-  const allTasks = [...sheetTasks, ...customTasks].filter(t => t.type !== 'once');
+  const allTasks = [...sheetTasks, ...customTasks].filter(t => t.type !== 'once' && t.freq !== 'once');
   const sampleDate = new Date(today); sampleDate.setDate(1);
   const sampledTotal = allTasks.filter(t => isDueOn(t, sampleDate)).length || 1;
   const completionRate = Math.min(100, Math.round((totalDone / (uniqueDays * sampledTotal)) * 100));
@@ -1382,10 +1500,23 @@ function renderHistory() {
 function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key) {
   const offset = CIRC * (1 - pct / 100);
   const rc = pct===100?"#4ade80":pct>=70?"#a3e635":pct>=40?"#facc15":"#f87171";
-  document.getElementById("ring-fill").style.strokeDashoffset = offset;
-  document.getElementById("ring-fill").style.stroke = rc;
-  document.getElementById("ring-pct").innerHTML = pct + '<span>%</span>';
+  const ringFill = document.getElementById("ring-fill");
+  const ringPct  = document.getElementById("ring-pct");
+  const wasFull  = ringFill.dataset.wasFull === "1";
+  ringFill.style.strokeDashoffset = offset;
+  ringFill.style.stroke = rc;
+  ringPct.innerHTML = pct + '<span>%</span>';
   document.getElementById("ring-label").textContent = "COMPLETE";
+  if (pct === 100 && !wasFull) {
+    ringFill.dataset.wasFull = "1";
+    const svg = document.querySelector("#ring-wrap svg");
+    svg.classList.remove("pulse");
+    void svg.offsetWidth;
+    svg.classList.add("pulse");
+    svg.addEventListener("animationend", () => svg.classList.remove("pulse"), { once: true });
+  } else if (pct < 100) {
+    ringFill.dataset.wasFull = "";
+  }
 
   let msg, sub, color;
   if      (pct===100) { msg="All done.";        sub="Enjoy your day ✓";                                       color="#4ade80"; }
@@ -1419,6 +1550,12 @@ function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key) {
     bar.innerHTML = `<div class="bar-meta"><span class="bar-name">${sec.label.toUpperCase()}</span><span class="bar-count">${sd}/${tasks.length}</span></div><div class="bar-track"><div class="bar-fill" style="width:${sp}%;background:${sec.accent}"></div></div>`;
     barsEl.appendChild(bar);
   });
+
+  // Top bar
+  const fill = document.getElementById("top-bar-fill");
+  fill.style.width = pct + "%";
+  const tbc = pct===100?"#4ade80":pct>=70?"#a3e635":pct>=40?"#facc15":"#f87171";
+  fill.style.background = `linear-gradient(90deg, ${tbc}, ${tbc}aa)`;
 }
 
 // ─── VIEW SWITCHING ───────────────────────────────────────────────────────────
