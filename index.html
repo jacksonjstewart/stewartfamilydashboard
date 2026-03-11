@@ -949,7 +949,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.10.7 · pre-release</div>
+    <div id="version-tag">v0.10.8 · pre-release</div>
   </div>
   </div>
 
@@ -1036,8 +1036,25 @@ function isMirrorsWeek(d) {
   sat.setHours(0,0,0,0);
   return Math.floor((sat - MIRRORS_ON) / (7*864e5)) % 2 === 0;
 }
-function isNthWeekday(d, dow, n) {
-  return d.getDay() === dow && Math.ceil(d.getDate() / 7) === n;
+function isNthWeekday(d, targetDow, n) {
+  // Normalize targetDow: 7 → 0 (Sunday)
+  const td = targetDow === 7 ? 0 : targetDow;
+  if (d.getDay() !== td) return false;
+  // Count how many times this weekday has fallen in the month so far (including today)
+  return Math.ceil(d.getDate() / 7) === n;
+}
+function nthWeekdayOfMonth(d, targetDow, n) {
+  // Returns true if d is the Nth occurrence of targetDow in its month
+  const td = targetDow === 7 ? 0 : targetDow;
+  if (d.getDay() !== td) return false;
+  // Walk back to the 1st of month, count matching weekdays up to and including d
+  let count = 0;
+  const check = new Date(d.getFullYear(), d.getMonth(), 1);
+  while (check <= d) {
+    if (check.getDay() === td) count++;
+    check.setDate(check.getDate() + 1);
+  }
+  return count === n;
 }
 function dateKey(d) {
   // Always use Edmonton local time, not UTC
@@ -1047,18 +1064,50 @@ function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); retu
 
 function isDueOn(task, d) {
   if (task.type === 'once') return true; // once tasks only shown for today
-  const dow = d.getDay(), month = d.getMonth() + 1;
+  const dow = d.getDay(), month = d.getMonth() + 1, date = d.getDate();
+
+  // ── NEW GENERIC PATTERNS ─────────────────────────────────────────────────
+  // weekly + dow (scalar or array) — e.g. dow=2 or dow=[2,6]
+  if (task.freq === 'weekly') {
+    if (Array.isArray(task.dow)) return task.dow.includes(dow);
+    return task.dow === dow;
+  }
+  // monthly + dotm — e.g. 15th of every month
+  if (task.freq === 'monthly' && task.dotm !== undefined) {
+    return date === task.dotm;
+  }
+  // monthly + dotwOrd + dow — e.g. 3rd Sunday (dotwOrd=3, dow=0)
+  if (task.freq === 'monthly' && task.dotwOrd !== undefined && task.dow !== undefined) {
+    const targetDow = Array.isArray(task.dow) ? task.dow[0] : task.dow;
+    return nthWeekdayOfMonth(d, targetDow, task.dotwOrd);
+  }
+  // yearly + yearMonth + dotm — e.g. March 15 every year
+  if (task.freq === 'yearly' && task.dotm !== undefined) {
+    return task.yearMonth === month && date === task.dotm;
+  }
+  // yearly + yearMonth + dotwOrd + dow — e.g. 2nd Tuesday of November
+  if (task.freq === 'yearly' && task.dotwOrd !== undefined) {
+    const targetDow = Array.isArray(task.dow) ? task.dow[0] : task.dow;
+    return task.yearMonth === month && nthWeekdayOfMonth(d, targetDow, task.dotwOrd);
+  }
+  // biweekly + dow (array or scalar)
+  if (task.freq === 'biweekly') {
+    const targetDow = Array.isArray(task.dow) ? task.dow[0] : task.dow;
+    if (task.anchorDate) {
+      const anchor = new Date(task.anchorDate + 'T00:00:00');
+      const weeksDiff = Math.round((d - anchor) / (7 * 864e5));
+      return d.getDay() === (targetDow ?? dow) && weeksDiff % 2 === 0;
+    }
+    return false;
+  }
+
+  // ── LEGACY NAMED PATTERNS (unchanged) ────────────────────────────────────
   switch (task.freq) {
     case "daily":                return true;
-    case "weekly":               return task.dow === dow;
-    case "biweekly-thu":
-    case "biweekly-thu-garbage": return dow === 4 && isGarbageWeek(d);
-    case "biweekly-daily":
-    case "biweekly-daily-cat":   return isCatWaterDay(d);
-    case "biweekly-sat":
-    case "biweekly-sat-mirrors": return dow === 6 && isMirrorsWeek(d);
-    case "monthly-sat":
-    case "monthly-check":        return isNthWeekday(d, 6, 1);
+    case "biweekly-thu":    case "biweekly-thu-garbage": return dow === 4 && isGarbageWeek(d);
+    case "biweekly-daily":    case "biweekly-daily-cat":   return isCatWaterDay(d);
+    case "biweekly-sat":    case "biweekly-sat-mirrors": return dow === 6 && isMirrorsWeek(d);
+    case "monthly-sat":    case "monthly-check":        return isNthWeekday(d, 6, 1);
     case "monthly-2nd":          return isNthWeekday(d, 6, 2);
     case "monthly-3rd":          return isNthWeekday(d, 6, 3);
     case "monthly-4th":          return isNthWeekday(d, 6, 4);
@@ -1110,17 +1159,47 @@ function isOTOMissed(task) {
 }
 
 function freqLabel(task) {
+  const ORDINALS = ["","1st","2nd","3rd","4th","5th"];
+  const normDow  = d => d === 7 ? 0 : d; // normalize 7→0 for Sunday
+
+  // ── NEW GENERIC PATTERNS ─────────────────────────────────────────────────
+  if (task.freq === 'weekly') {
+    if (Array.isArray(task.dow)) {
+      const names = task.dow.map(d => DAYS[normDow(d)]);
+      return "Every " + names.slice(0,-1).join(", ") + (names.length > 1 ? " & " + names[names.length-1] : names[0]);
+    }
+    return "Every " + DAYS[normDow(task.dow)];
+  }
+  if (task.freq === 'monthly' && task.dotm !== undefined) {
+    const s = task.dotm;
+    const suffix = s === 1||s===21||s===31 ? "st" : s===2||s===22 ? "nd" : s===3||s===23 ? "rd" : "th";
+    return "Monthly · " + s + suffix;
+  }
+  if (task.freq === 'monthly' && task.dotwOrd !== undefined && task.dow !== undefined) {
+    const targetDow = Array.isArray(task.dow) ? task.dow[0] : task.dow;
+    return "Monthly · " + (ORDINALS[task.dotwOrd]||task.dotwOrd+"th") + " " + DAYS[normDow(targetDow)];
+  }
+  if (task.freq === 'yearly' && task.dotm !== undefined) {
+    const s = task.dotm;
+    const suffix = s===1||s===21||s===31?"st":s===2||s===22?"nd":s===3||s===23?"rd":"th";
+    return "Yearly · " + MONTHS[(task.yearMonth||1)-1].slice(0,3) + " " + s + suffix;
+  }
+  if (task.freq === 'yearly' && task.dotwOrd !== undefined) {
+    const targetDow = Array.isArray(task.dow) ? task.dow[0] : task.dow;
+    return "Yearly · " + (ORDINALS[task.dotwOrd]||task.dotwOrd+"th") + " " + DAYS[normDow(targetDow)] + " of " + MONTHS[(task.yearMonth||1)-1];
+  }
+  if (task.freq === 'biweekly') {
+    const targetDow = Array.isArray(task.dow) ? task.dow[0] : (task.dow ?? 0);
+    return "Every other " + DAYS[normDow(targetDow)];
+  }
+
+  // ── LEGACY ────────────────────────────────────────────────────────────────
   switch (task.freq) {
     case "daily":                return "Every day";
-    case "weekly":               return "Every " + DAYS[task.dow];
-    case "biweekly-thu":
-    case "biweekly-thu-garbage": return "Every other Thursday";
-    case "biweekly-daily":
-    case "biweekly-daily-cat":   return "Every other day";
-    case "biweekly-sat":
-    case "biweekly-sat-mirrors": return "Every other Saturday";
-    case "monthly-sat":
-    case "monthly-check":        return "Monthly · 1st Saturday";
+    case "biweekly-thu":    case "biweekly-thu-garbage": return "Every other Thursday";
+    case "biweekly-daily":    case "biweekly-daily-cat":   return "Every other day";
+    case "biweekly-sat":    case "biweekly-sat-mirrors": return "Every other Saturday";
+    case "monthly-sat":    case "monthly-check":        return "Monthly · 1st Saturday";
     case "monthly-2nd":          return "Monthly · 2nd Saturday";
     case "monthly-3rd":          return "Monthly · 3rd Saturday";
     case "monthly-4th":          return "Monthly · 4th Saturday";
@@ -1180,8 +1259,16 @@ function parseCSV(text) {
       emoji:       obj["emoji"]     || "✅",
       section:     obj["section"]   || "home",
       freq:        taskFreq,
-      dow:         obj["dow"]       !== "" ? parseInt(obj["dow"])       : undefined,
+      dow:         (() => {
+        const raw = (obj["dow"] || "").trim();
+        if (raw === "") return undefined;
+        // Support comma-separated days e.g. "2,6" for Tue+Sat; normalize 7→0 (Sun)
+        const days = raw.split(",").map(s => { const n = parseInt(s.trim()); return n === 7 ? 0 : n; }).filter(n => !isNaN(n));
+        return days.length === 1 ? days[0] : days; // scalar for single, array for multi
+      })(),
       yearMonth:   obj["yearmonth"] !== "" ? parseInt(obj["yearmonth"]) : undefined,
+      dotm:        obj["dotm"]      !== "" && obj["dotm"]      !== undefined ? parseInt(obj["dotm"])      : undefined,
+      dotwOrd:     obj["dotw_ord"]  !== "" && obj["dotw_ord"]  !== undefined ? parseInt(obj["dotw_ord"])  : undefined,
       notes:       rawNotes,
       pushforward: (obj["pushforward"] || "").toLowerCase().trim(),
       type:        taskType,
