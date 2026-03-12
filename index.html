@@ -1058,7 +1058,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.10.10 · pre-release</div>
+    <div id="version-tag">v0.10.11 · pre-release</div>
   </div>
   </div>
 
@@ -1166,8 +1166,27 @@ function nthWeekdayOfMonth(d, targetDow, n) {
   return count === n;
 }
 function dateKey(d) {
-  // Always use Edmonton local time, not UTC
-  return d.toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' });
+  // Edmonton offset: MDT = UTC-6 (Mar 2nd Sun to Nov 1st Sun), else MST = UTC-7
+  // This avoids toLocaleDateString timeZone option which breaks on iOS 12
+  function edmontonOffset(dt) {
+    var y = dt.getUTCFullYear();
+    // DST start: 2nd Sunday of March 2:00 AM local = MST+1 so 9:00 UTC
+    var dstStart = new Date(Date.UTC(y, 2, 1));
+    while (dstStart.getUTCDay() !== 0) dstStart.setUTCDate(dstStart.getUTCDate() + 1);
+    dstStart.setUTCDate(dstStart.getUTCDate() + 7); // 2nd Sunday
+    dstStart.setUTCHours(9, 0, 0, 0);
+    // DST end: 1st Sunday of November 2:00 AM local MDT = UTC-6 so 8:00 UTC
+    var dstEnd = new Date(Date.UTC(y, 10, 1));
+    while (dstEnd.getUTCDay() !== 0) dstEnd.setUTCDate(dstEnd.getUTCDate() + 1);
+    dstEnd.setUTCHours(8, 0, 0, 0);
+    return (dt >= dstStart && dt < dstEnd) ? -6 : -7; // hours offset
+  }
+  var offset = edmontonOffset(d);
+  var local  = new Date(d.getTime() + offset * 3600000);
+  var yy = local.getUTCFullYear();
+  var mm = String(local.getUTCMonth() + 1).padStart(2, '0');
+  var dd = String(local.getUTCDate()).padStart(2, '0');
+  return yy + '-' + mm + '-' + dd;
 }
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 
@@ -1212,7 +1231,7 @@ function isDueOn(task, d) {
     if (task.anchorDate) {
       const anchor = new Date(task.anchorDate + 'T00:00:00');
       const weeksDiff = Math.round((d - anchor) / (7 * 864e5));
-      return d.getDay() === (targetDow ?? dow) && weeksDiff % 2 === 0;
+      return d.getDay() === (targetDow !== undefined ? targetDow : dow) && weeksDiff % 2 === 0;
     }
     return false;
   }
@@ -1306,7 +1325,7 @@ function freqLabel(task) {
     return "Yearly · " + (ORDINALS[task.dotwOrd]||task.dotwOrd+"th") + " " + DAYS[normDow(targetDow)] + " of " + MONTHS[(task.yearMonth||1)-1];
   }
   if (task.freq === 'biweekly') {
-    const targetDow = Array.isArray(task.dow) ? task.dow[0] : (task.dow ?? 0);
+    const targetDow = Array.isArray(task.dow) ? task.dow[0] : (task.dow !== undefined ? task.dow : 0);
     return "Every other " + DAYS[normDow(targetDow)];
   }
 
@@ -1447,7 +1466,7 @@ async function commitToHistory(entries, missedOTOs) {
       rawHistory.push(entry);
     });
     try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory })); } catch(e) {}
-    console.log("Commit OK:", entries.length, "entries for", entries[0]?.dateKey);
+    console.log("Commit OK:", entries.length, "entries for", entries[0] ? entries[0].dateKey : "");
     return { ok: true };
   } catch(err) {
     console.warn("Commit failed — will retry on next load:", err);
@@ -1721,7 +1740,7 @@ let historyRangeDays = 365;
 
 // Use Edmonton local time for all date calculations
 function getEdmontonDateKey(d) {
-  return (d || new Date()).toLocaleDateString('en-CA', { timeZone: 'America/Edmonton' });
+  return dateKey(d || new Date());
 }
 const todayKey = getEdmontonDateKey();
 const today    = new Date(todayKey + 'T00:00:00'); // midnight local
