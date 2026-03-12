@@ -1077,7 +1077,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.1 · pre-release</div>
+    <div id="version-tag">v0.11.2 · pre-release</div>
   </div>
   </div>
 
@@ -1144,9 +1144,9 @@ const SECTIONS = [
 const CIRC = 2 * Math.PI * 100;
 
 // ─── BIWEEKLY ANCHORS ─────────────────────────────────────────────────────────
-const GARBAGE_ON   = new Date("2026-02-19T00:00:00");
-const CAT_WATER_ON = new Date("2026-03-08T00:00:00");
-const MIRRORS_ON   = new Date("2026-03-07T00:00:00");
+const GARBAGE_ON   = new Date(Date.UTC(2026, 1, 19)); // Feb 19 UTC — DST-proof
+const CAT_WATER_ON = new Date(Date.UTC(2026, 2,  8)); // Mar 8  UTC — DST-proof
+const MIRRORS_ON   = new Date(Date.UTC(2026, 2,  7)); // Mar 7  UTC — DST-proof
 
 // ─── DATE HELPERS ─────────────────────────────────────────────────────────────
 function isGarbageWeek(d) {
@@ -1160,9 +1160,9 @@ function isCatWaterDay(d) {
   return Math.round((t - CAT_WATER_ON) / 864e5) % 2 === 0;
 }
 function isMirrorsWeek(d) {
-  const sat = new Date(d);
-  sat.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));
-  sat.setHours(0,0,0,0);
+  var localSat = new Date(d);
+  localSat.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));
+  var sat = Date.UTC(localSat.getFullYear(), localSat.getMonth(), localSat.getDate());
   return Math.floor((sat - MIRRORS_ON) / (7*864e5)) % 2 === 0;
 }
 function isNthWeekday(d, targetDow, n) {
