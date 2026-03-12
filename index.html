@@ -328,18 +328,16 @@
   /* collapsible body */
   .ahead-body { display: none; margin-top: 10px; }
   .ahead-body.open { display: block; }
-  .task-row.ahead {
-    border-color: rgba(125,211,252,0.12);
-    background: rgba(125,211,252,0.02);
-  }
+  /* ── GET AHEAD task row — sky blue treatment matching OTO amber pattern ── */
+  .task-row.ahead { background: rgba(125,211,252,0.04); border-color: rgba(125,211,252,0.15); }
   .task-row.ahead .task-name { color: #a8d8ee; }
-  .ahead-badge {
-    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
-    color: #3a7a9a; background: rgba(125,211,252,0.08);
-    border: 1px solid rgba(125,211,252,0.15);
-    border-radius: 99px; padding: 2px 7px;
-    white-space: nowrap; flex-shrink: 0;
-  }
+  .task-row.ahead .task-freq { color: #2a5a70; }
+  .task-row.ahead .task-checkbox { border-color: #1a4a60; }
+  .task-row.ahead.done { background: rgba(74,222,128,0.04); border-color: rgba(74,222,128,0.12); }
+  .task-row.ahead.done .task-name { color: #2a2a2a; text-decoration: line-through; }
+  .task-row.ahead.done .task-checkbox { border-color: #4ade80; background: #4ade80; }
+  /* ahead-badge reuses section-pill base, just needs color */
+  .ahead-badge { color: #7dd3fc; background: rgba(125,211,252,0.08); border: 1px solid rgba(125,211,252,0.18); }
 
   /* ── OVERDUE OTO ── */
   .task-row.overdue {
@@ -1096,7 +1094,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.3 · pre-release</div>
+    <div id="version-tag">v0.11.4 · pre-release</div>
   </div>
   </div>
 
@@ -2039,7 +2037,7 @@ setInterval(updateClock, 1000);
 updateClock();
 
 // ─── SHARED TASK ROW BUILDER ──────────────────────────────────────────────────
-function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
+function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, aheadBadgeText) {
   const hasNotes = !!(task.notes && task.notes.trim());
   let notesHTML = "";
   if (hasNotes) {
@@ -2056,6 +2054,9 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
   const pillHTML = isOnce && secObj
     ? `<span class="section-pill" style="background:${secObj.accent}22;color:${secObj.accent};border:1px solid ${secObj.accent}33">${secObj.label.toUpperCase()}</span>`
     : '';
+  const aheadBadgeHTML = aheadBadgeText
+    ? `<span class="section-pill ahead-badge">${aheadBadgeText}</span>`
+    : '';
 
   const wrap = document.createElement("div");
   wrap.className = "task-wrap";
@@ -2063,11 +2064,12 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
   const row = document.createElement("div");
   const isOverdue = !isDone && isOnce && task.targetDate && isOTOOverdue(task);
   row.className = "task-row"
-    + (isDone     ? " done"     : "")
-    + (hasNotes   ? ""          : " no-notes")
-    + (isOnce     ? " once"     : "")
-    + (isOverdue  ? " overdue"  : "")
-    + (isReadOnly ? " readonly" : "");
+    + (isDone          ? " done"     : "")
+    + (hasNotes        ? ""          : " no-notes")
+    + (isOnce          ? " once"     : "")
+    + (isOverdue       ? " overdue"  : "")
+    + (isReadOnly      ? " readonly" : "")
+    + (aheadBadgeText  ? " ahead"    : "");
   const isCarried = !isDone && pushForwardList.includes(task.id);
   row.innerHTML = `
     <div class="task-checkbox"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 3.5l3 3 5-5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -2076,7 +2078,7 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly) {
       <div class="task-name">${isCarried ? '<span class="carry-dot"></span>' : ''}${task.name}</div>
       <div class="task-freq">${isOverdue ? "Due yesterday · overdue" : (stampText || freqLabel(task))}</div>
     </div>
-    ${pillHTML}
+    ${pillHTML}${aheadBadgeHTML}
     ${isOverdue ? '<span class="overdue-badge">OVERDUE</span>' : ''}
     ${hasNotes ? `<div class="task-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>` : ""}`;
 
@@ -2132,6 +2134,43 @@ function renderInPlace() {
     if (fr) fr.className = 'task-freq' + (isDone ? ' stamped' : '');
   });
 
+  // ── GET AHEAD — always last, collapsible ──────────────────────────────────
+  if (getAheadTasks && getAheadTasks.length > 0) {
+    const sp2 = document.createElement('div'); sp2.style.cssText = 'height:18px;'; listEl.appendChild(sp2);
+    const pendingAhead = getAheadTasks.filter(function(t) { return !doneLog[t.id + '_' + todayKey]; });
+    var aheadOpen = localStorage.getItem('hd_ahead_open') === '1';
+    const aToggle = document.createElement('div');
+    aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
+    const countTxt = pendingAhead.length > 0 ? pendingAhead.length + ' UPCOMING' : 'ALL CAUGHT UP';
+    aToggle.innerHTML = 'GET AHEAD <span class="ahead-count">' + countTxt + '</span><span class="ahead-chevron">&#9654;</span>';
+    listEl.appendChild(aToggle);
+    const aBody = document.createElement('div');
+    aBody.className = 'ahead-body' + (aheadOpen ? ' open' : '');
+    listEl.appendChild(aBody);
+    aToggle.addEventListener('click', function() {
+      aheadOpen = !aheadOpen;
+      aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
+      aBody.className   = 'ahead-body'   + (aheadOpen ? ' open' : '');
+      localStorage.setItem('hd_ahead_open', aheadOpen ? '1' : '0');
+    });
+    const sortedAhead = [...getAheadTasks].sort(function(a, b) {
+      const ad = !!doneLog[a.id+'_'+todayKey], bd = !!doneLog[b.id+'_'+todayKey];
+      if (ad !== bd) return ad - bd;
+      return (daysUntilDue(a) || 999) - (daysUntilDue(b) || 999);
+    });
+    sortedAhead.forEach(function(task) {
+      const isDone   = !!doneLog[task.id + '_' + todayKey];
+      const isCustom = customTasks.some(function(c) { return c.id === task.id; });
+      const _dk      = task.id + '_' + todayKey;
+      const tempStamp = isDone ? 'Last completed ' + formatStamp(doneTs(_dk)||'', doneWho(_dk)||currentIdentity) : null;
+      const permEntry = permanentHistory[task.id];
+      const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
+        ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
+      const row = buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false, isDone ? null : getAheadLabel(task));
+      aBody.appendChild(row);
+    });
+  }
+
   updateRightColumn(pct, doneCount, total, remaining, todayTasks, todayKey);
 }
 
@@ -2176,68 +2215,16 @@ function render() {
       });
     }
 
-    // ── 2. GET AHEAD — recurring tasks in their annual lead window ──────────────
+    // ── 2. GET AHEAD — collected here, rendered AFTER recurring (see below) ──────
     const getAheadTasks = todayTasks.filter(t =>
       t.type !== 'once' && t.dueDate && isGetAheadTask(t)
     );
-    if (getAheadTasks.length > 0) {
-      if (allOnceTasks.length > 0 || getAheadTasks.length > 0) {
-        const sp = document.createElement('div'); sp.style.cssText = 'height:18px;'; listEl.appendChild(sp);
-      }
-      const pendingAhead = getAheadTasks.filter(t => !doneLog[t.id + '_' + todayKey]);
-      const doneAhead    = getAheadTasks.filter(t =>  !!doneLog[t.id + '_' + todayKey]);
-      // Restore collapsed state from localStorage
-      var aheadOpen = localStorage.getItem('hd_ahead_open') === '1';
-      const aToggle = document.createElement('div');
-      aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
-      const countTxt = pendingAhead.length > 0 ? pendingAhead.length + ' UPCOMING' : 'ALL CAUGHT UP';
-      aToggle.innerHTML = 'GET AHEAD <span class="ahead-count">' + countTxt + '</span><span class="ahead-chevron">&#9654;</span>';
-      listEl.appendChild(aToggle);
-
-      const aBody = document.createElement('div');
-      aBody.className = 'ahead-body' + (aheadOpen ? ' open' : '');
-      listEl.appendChild(aBody);
-
-      aToggle.addEventListener('click', function() {
-        aheadOpen = !aheadOpen;
-        aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
-        aBody.className   = 'ahead-body'   + (aheadOpen ? ' open' : '');
-        localStorage.setItem('hd_ahead_open', aheadOpen ? '1' : '0');
-      });
-
-      const sortedAhead = [...getAheadTasks].sort((a, b) => {
-        const ad = !!doneLog[a.id+'_'+todayKey], bd = !!doneLog[b.id+'_'+todayKey];
-        if (ad !== bd) return ad - bd;
-        return (daysUntilDue(a) || 999) - (daysUntilDue(b) || 999);
-      });
-      sortedAhead.forEach(function(task) {
-        const isDone   = !!doneLog[task.id + '_' + todayKey];
-        const isCustom = customTasks.some(function(c) { return c.id === task.id; });
-        const _dk      = task.id + '_' + todayKey;
-        const tempStamp = isDone ? 'Last completed ' + formatStamp(doneTs(_dk)||'', doneWho(_dk)||currentIdentity) : null;
-        const permEntry = permanentHistory[task.id];
-        const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
-          ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
-        const row = buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false);
-        row.classList.add('ahead');
-        // Badge right-aligned — injected before chevron (matching OTO pill position)
-        if (!isDone) {
-          const badge = document.createElement('span');
-          badge.className = 'ahead-badge';
-          badge.textContent = getAheadLabel(task);
-          const chevron = row.querySelector('.task-chevron');
-          if (chevron) { row.insertBefore(badge, chevron); }
-          else { row.appendChild(badge); }
-        }
-        aBody.appendChild(row);
-      });
-    }
 
     // ── 3. RECURRING — sections with incomplete tasks first, fully-done sections last ──
     const recurringTasks = todayTasks.filter(t => t.type !== 'once' && !isGetAheadTask(t));
     if (recurringTasks.length > 0) {
-      // If OTO or get-ahead tasks shown above, add breathing room
-      if (allOnceTasks.length > 0 || getAheadTasks.length > 0) {
+      // If OTO tasks shown above, add breathing room
+      if (allOnceTasks.length > 0) {
         const spacer = document.createElement("div");
         spacer.style.cssText = "height:18px;";
         listEl.appendChild(spacer);
