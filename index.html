@@ -506,8 +506,7 @@
   .modal-select:focus { border-color: #333; }
 
   /* Freq sub-options */
-  #modal-freq-opts { display: none; flex-direction: column; gap: 10px; }
-  #modal-freq-opts.visible { display: flex; }
+  #modal-freq-opts { display: flex; flex-direction: column; gap: 14px; }
 
   .modal-submit {
     background: #1a1a1a; border: 1px solid #2a2a2a; color: #e8e8e8;
@@ -939,7 +938,7 @@
           </div>
 
           <!-- WEEKLY: day pills (multi-select) -->
-          <div id="modal-weekly-field" class="modal-field" style="display:none">
+          <div id="modal-weekly-field" class="modal-field" style="display:none;margin-top:4px">
             <div class="modal-label">DAY(S) OF WEEK</div>
             <div class="day-pills">
               <button type="button" class="day-pill" data-dow="1">MON</button>
@@ -1059,7 +1058,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.10.9 · pre-release</div>
+    <div id="version-tag">v0.10.10 · pre-release</div>
   </div>
   </div>
 
@@ -1183,8 +1182,11 @@ function isDueOn(task, d) {
     return task.dow === dow;
   }
   // monthly + dotm — e.g. 15th of every month
+  // Smart fallback: if dotm > days in this month, fire on last day of month instead
   if (task.freq === 'monthly' && task.dotm !== undefined) {
-    return date === task.dotm;
+    const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const target = Math.min(task.dotm, daysInMonth);
+    return date === target;
   }
   // monthly + dotwOrd + dow — e.g. 3rd Sunday (dotwOrd=3, dow=0)
   if (task.freq === 'monthly' && task.dotwOrd !== undefined && task.dow !== undefined) {
@@ -1192,8 +1194,12 @@ function isDueOn(task, d) {
     return nthWeekdayOfMonth(d, targetDow, task.dotwOrd);
   }
   // yearly + yearMonth + dotm — e.g. March 15 every year
+  // Smart fallback for short months (e.g. Feb 30 → Feb 28/29)
   if (task.freq === 'yearly' && task.dotm !== undefined) {
-    return task.yearMonth === month && date === task.dotm;
+    if (task.yearMonth !== month) return false;
+    const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const target = Math.min(task.dotm, daysInMonth);
+    return date === target;
   }
   // yearly + yearMonth + dotwOrd + dow — e.g. 2nd Tuesday of November
   if (task.freq === 'yearly' && task.dotwOrd !== undefined) {
@@ -1282,8 +1288,9 @@ function freqLabel(task) {
   }
   if (task.freq === 'monthly' && task.dotm !== undefined) {
     const s = task.dotm;
-    const suffix = s === 1||s===21||s===31 ? "st" : s===2||s===22 ? "nd" : s===3||s===23 ? "rd" : "th";
-    return "Monthly · " + s + suffix;
+    const suffix = s===1||s===21||s===31?"st":s===2||s===22?"nd":s===3||s===23?"rd":"th";
+    const note   = s > 28 ? " (or last day)" : "";
+    return "Monthly · " + s + suffix + note;
   }
   if (task.freq === 'monthly' && task.dotwOrd !== undefined && task.dow !== undefined) {
     const targetDow = Array.isArray(task.dow) ? task.dow[0] : task.dow;
@@ -2713,7 +2720,8 @@ function resetModal() {
   document.getElementById('m-section').value = 'home';
   document.getElementById('m-type').value    = 'recurring';
   document.getElementById('m-freq').value    = 'daily';
-  document.getElementById('modal-date-field').style.display = 'none';
+  document.getElementById('modal-date-field').style.display  = 'none';
+  document.getElementById('modal-freq-opts').style.display   = 'flex';
   document.getElementById('m-targetdate').value = '';
   // Hide all freq sub-fields
   ['modal-weekly-field','modal-biweekly-field',
@@ -2731,7 +2739,7 @@ function resetModal() {
 
 function onModalTypeChange() {
   const isOnce = document.getElementById('m-type').value === 'once';
-  document.getElementById('modal-freq-opts').style.display = isOnce ? 'none' : 'block';
+  document.getElementById('modal-freq-opts').style.display = isOnce ? 'none' : 'flex';
   document.getElementById('modal-date-field').style.display = isOnce ? 'block' : 'none';
   if (isOnce) document.getElementById('m-targetdate').value = todayKey;
 }
