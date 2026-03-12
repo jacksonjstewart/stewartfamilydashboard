@@ -305,21 +305,40 @@
   .type-header.once-header.once-all-done::after { background: #1a3a1a; }
 
   /* ── GET AHEAD block ── */
-  .type-header.ahead-header { color: #7a5a3a; }
-  .type-header.ahead-header::after { background: #2a1e10; }
-  .type-header.ahead-header.ahead-all-done { color: #f4a4b8; }
-  .type-header.ahead-header.ahead-all-done::after { background: #3a1a22; }
-  .task-row.ahead {
-    border-color: rgba(244,164,184,0.15);
-    background: rgba(244,164,184,0.03);
+  /* ── GET AHEAD collapsed header ── */
+  .ahead-toggle {
+    font-size: 9px; font-weight: 700; letter-spacing: 3px;
+    color: #2a4a5a; margin: 18px 0 0 2px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer; user-select: none;
   }
-  .task-row.ahead .task-name { color: #c8a8b0; }
+  .ahead-toggle::after { content: ''; flex: 1; height: 1px; background: #0d2030; }
+  .ahead-toggle .ahead-chevron {
+    font-size: 8px; color: #2a4a5a; transition: transform 0.2s;
+    margin-left: -6px;
+  }
+  .ahead-toggle.open { color: #7dd3fc; }
+  .ahead-toggle.open::after { background: #0d2535; }
+  .ahead-toggle.open .ahead-chevron { transform: rotate(90deg); color: #7dd3fc; }
+  .ahead-toggle .ahead-count {
+    font-size: 9px; font-weight: 500; letter-spacing: 1px;
+    color: #2a5a7a; margin-left: -4px;
+  }
+  .ahead-toggle.open .ahead-count { color: #5ab8e8; }
+  /* collapsible body */
+  .ahead-body { display: none; margin-top: 10px; }
+  .ahead-body.open { display: block; }
+  .task-row.ahead {
+    border-color: rgba(125,211,252,0.12);
+    background: rgba(125,211,252,0.02);
+  }
+  .task-row.ahead .task-name { color: #a8d8ee; }
   .ahead-badge {
     font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
-    color: #7a4a58; background: rgba(244,164,184,0.08);
-    border: 1px solid rgba(244,164,184,0.15);
+    color: #3a7a9a; background: rgba(125,211,252,0.08);
+    border: 1px solid rgba(125,211,252,0.15);
     border-radius: 99px; padding: 2px 7px;
-    white-space: nowrap;
+    white-space: nowrap; flex-shrink: 0;
   }
 
   /* ── OVERDUE OTO ── */
@@ -1077,7 +1096,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.2 · pre-release</div>
+    <div id="version-tag">v0.11.3 · pre-release</div>
   </div>
   </div>
 
@@ -1390,6 +1409,18 @@ function freqLabel(task) {
   if (task.freq === 'yearly' && task.dotwOrd !== undefined) {
     const targetDow = Array.isArray(task.dow) ? task.dow[0] : task.dow;
     return "Yearly · " + (ORDINALS[task.dotwOrd]||task.dotwOrd+"th") + " " + DAYS[normDow(targetDow)] + " of " + MONTHS[(task.yearMonth||1)-1];
+  }
+  if (task.freq === 'yearly' && task.dueDate) {
+    // dueDate-only yearly task — derive month from MM-DD
+    var ddParts = task.dueDate.split('-');
+    var ddMonth = parseInt(ddParts[0]);
+    if (!isNaN(ddMonth)) {
+      var days = daysUntilDue(task);
+      var monthName = MONTHS[ddMonth - 1];
+      if (days !== null && days <= 14 && days >= 0) return 'Due in ' + days + (days===1?' day':' days') + ' · ' + monthName;
+      if (days !== null && days < 0) return 'Overdue · ' + monthName;
+      return 'Upcoming in ' + monthName;
+    }
   }
   if (task.freq === 'biweekly') {
     const targetDow = Array.isArray(task.dow) ? task.dow[0] : (task.dow !== undefined ? task.dow : 0);
@@ -2153,20 +2184,35 @@ function render() {
       if (allOnceTasks.length > 0 || getAheadTasks.length > 0) {
         const sp = document.createElement('div'); sp.style.cssText = 'height:18px;'; listEl.appendChild(sp);
       }
-      const allAheadDone = getAheadTasks.every(t => !!doneLog[t.id + '_' + todayKey]);
-      const aHdr = document.createElement('div');
-      aHdr.className = 'type-header ahead-header' + (allAheadDone ? ' ahead-all-done' : '');
-      aHdr.textContent = 'GET AHEAD';
-      listEl.appendChild(aHdr);
+      const pendingAhead = getAheadTasks.filter(t => !doneLog[t.id + '_' + todayKey]);
+      const doneAhead    = getAheadTasks.filter(t =>  !!doneLog[t.id + '_' + todayKey]);
+      // Restore collapsed state from localStorage
+      var aheadOpen = localStorage.getItem('hd_ahead_open') === '1';
+      const aToggle = document.createElement('div');
+      aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
+      const countTxt = pendingAhead.length > 0 ? pendingAhead.length + ' UPCOMING' : 'ALL CAUGHT UP';
+      aToggle.innerHTML = 'GET AHEAD <span class="ahead-count">' + countTxt + '</span><span class="ahead-chevron">&#9654;</span>';
+      listEl.appendChild(aToggle);
+
+      const aBody = document.createElement('div');
+      aBody.className = 'ahead-body' + (aheadOpen ? ' open' : '');
+      listEl.appendChild(aBody);
+
+      aToggle.addEventListener('click', function() {
+        aheadOpen = !aheadOpen;
+        aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
+        aBody.className   = 'ahead-body'   + (aheadOpen ? ' open' : '');
+        localStorage.setItem('hd_ahead_open', aheadOpen ? '1' : '0');
+      });
+
       const sortedAhead = [...getAheadTasks].sort((a, b) => {
         const ad = !!doneLog[a.id+'_'+todayKey], bd = !!doneLog[b.id+'_'+todayKey];
-        if (ad !== bd) return ad - bd; // incomplete first
-        // Sort by urgency — fewest days first
+        if (ad !== bd) return ad - bd;
         return (daysUntilDue(a) || 999) - (daysUntilDue(b) || 999);
       });
-      sortedAhead.forEach(task => {
+      sortedAhead.forEach(function(task) {
         const isDone   = !!doneLog[task.id + '_' + todayKey];
-        const isCustom = customTasks.some(c => c.id === task.id);
+        const isCustom = customTasks.some(function(c) { return c.id === task.id; });
         const _dk      = task.id + '_' + todayKey;
         const tempStamp = isDone ? 'Last completed ' + formatStamp(doneTs(_dk)||'', doneWho(_dk)||currentIdentity) : null;
         const permEntry = permanentHistory[task.id];
@@ -2174,15 +2220,16 @@ function render() {
           ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
         const row = buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false);
         row.classList.add('ahead');
-        // Inject urgency badge after emoji
+        // Badge right-aligned — injected before chevron (matching OTO pill position)
         if (!isDone) {
           const badge = document.createElement('span');
           badge.className = 'ahead-badge';
           badge.textContent = getAheadLabel(task);
-          const nameEl = row.querySelector('.task-name');
-          if (nameEl && nameEl.parentNode) nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
+          const chevron = row.querySelector('.task-chevron');
+          if (chevron) { row.insertBefore(badge, chevron); }
+          else { row.appendChild(badge); }
         }
-        listEl.appendChild(row);
+        aBody.appendChild(row);
       });
     }
 
