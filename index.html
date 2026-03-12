@@ -1094,7 +1094,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.4 · pre-release</div>
+    <div id="version-tag">v0.11.5 · pre-release</div>
   </div>
   </div>
 
@@ -2134,43 +2134,6 @@ function renderInPlace() {
     if (fr) fr.className = 'task-freq' + (isDone ? ' stamped' : '');
   });
 
-  // ── GET AHEAD — always last, collapsible ──────────────────────────────────
-  if (getAheadTasks && getAheadTasks.length > 0) {
-    const sp2 = document.createElement('div'); sp2.style.cssText = 'height:18px;'; listEl.appendChild(sp2);
-    const pendingAhead = getAheadTasks.filter(function(t) { return !doneLog[t.id + '_' + todayKey]; });
-    var aheadOpen = localStorage.getItem('hd_ahead_open') === '1';
-    const aToggle = document.createElement('div');
-    aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
-    const countTxt = pendingAhead.length > 0 ? pendingAhead.length + ' UPCOMING' : 'ALL CAUGHT UP';
-    aToggle.innerHTML = 'GET AHEAD <span class="ahead-count">' + countTxt + '</span><span class="ahead-chevron">&#9654;</span>';
-    listEl.appendChild(aToggle);
-    const aBody = document.createElement('div');
-    aBody.className = 'ahead-body' + (aheadOpen ? ' open' : '');
-    listEl.appendChild(aBody);
-    aToggle.addEventListener('click', function() {
-      aheadOpen = !aheadOpen;
-      aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
-      aBody.className   = 'ahead-body'   + (aheadOpen ? ' open' : '');
-      localStorage.setItem('hd_ahead_open', aheadOpen ? '1' : '0');
-    });
-    const sortedAhead = [...getAheadTasks].sort(function(a, b) {
-      const ad = !!doneLog[a.id+'_'+todayKey], bd = !!doneLog[b.id+'_'+todayKey];
-      if (ad !== bd) return ad - bd;
-      return (daysUntilDue(a) || 999) - (daysUntilDue(b) || 999);
-    });
-    sortedAhead.forEach(function(task) {
-      const isDone   = !!doneLog[task.id + '_' + todayKey];
-      const isCustom = customTasks.some(function(c) { return c.id === task.id; });
-      const _dk      = task.id + '_' + todayKey;
-      const tempStamp = isDone ? 'Last completed ' + formatStamp(doneTs(_dk)||'', doneWho(_dk)||currentIdentity) : null;
-      const permEntry = permanentHistory[task.id];
-      const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
-        ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
-      const row = buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false, isDone ? null : getAheadLabel(task));
-      aBody.appendChild(row);
-    });
-  }
-
   updateRightColumn(pct, doneCount, total, remaining, todayTasks, todayKey);
 }
 
@@ -2267,6 +2230,46 @@ function render() {
   }
 
   // ── Right column: today stats ─────────────────────────────────────────────
+
+
+
+
+  // ── GET AHEAD — always last, collapsible ──────────────────────────────────
+  if (getAheadTasks && getAheadTasks.length > 0) {
+    const sp2 = document.createElement('div'); sp2.style.cssText = 'height:18px;'; listEl.appendChild(sp2);
+    const pendingAhead = getAheadTasks.filter(function(t) { return !doneLog[t.id + '_' + todayKey]; });
+    var aheadOpen = localStorage.getItem('hd_ahead_open') === '1';
+    const aToggle = document.createElement('div');
+    aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
+    const countTxt = pendingAhead.length > 0 ? pendingAhead.length + ' UPCOMING' : 'ALL CAUGHT UP';
+    aToggle.innerHTML = 'GET AHEAD <span class="ahead-count">' + countTxt + '</span><span class="ahead-chevron">&#9654;</span>';
+    listEl.appendChild(aToggle);
+    const aBody = document.createElement('div');
+    aBody.className = 'ahead-body' + (aheadOpen ? ' open' : '');
+    listEl.appendChild(aBody);
+    aToggle.addEventListener('click', function() {
+      aheadOpen = !aheadOpen;
+      aToggle.className = 'ahead-toggle' + (aheadOpen ? ' open' : '');
+      aBody.className   = 'ahead-body'   + (aheadOpen ? ' open' : '');
+      localStorage.setItem('hd_ahead_open', aheadOpen ? '1' : '0');
+    });
+    const sortedAhead = [...getAheadTasks].sort(function(a, b) {
+      const ad = !!doneLog[a.id+'_'+todayKey], bd = !!doneLog[b.id+'_'+todayKey];
+      if (ad !== bd) return ad - bd;
+      return (daysUntilDue(a) || 999) - (daysUntilDue(b) || 999);
+    });
+    sortedAhead.forEach(function(task) {
+      const isDone   = !!doneLog[task.id + '_' + todayKey];
+      const isCustom = customTasks.some(function(c) { return c.id === task.id; });
+      const _dk      = task.id + '_' + todayKey;
+      const tempStamp = isDone ? 'Last completed ' + formatStamp(doneTs(_dk)||'', doneWho(_dk)||currentIdentity) : null;
+      const permEntry = permanentHistory[task.id];
+      const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
+        ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
+      const row = buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false, isDone ? null : getAheadLabel(task));
+      aBody.appendChild(row);
+    });
+  }
   updateRightColumn(pct, doneCount, total, remaining, todayTasks, todayKey);
 }
 
