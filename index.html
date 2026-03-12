@@ -1094,7 +1094,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.5 · pre-release</div>
+    <div id="version-tag">v0.11.6 · pre-release</div>
   </div>
   </div>
 
@@ -2176,15 +2176,15 @@ function render() {
           ? "Last completed " + formatStamp(permEntry.completedAt, permEntry.who) : null;
         listEl.appendChild(buildTaskRow(task, true, isDone, isCustom, tempStamp || permStamp, false));
       });
-    }
-
+    
     // ── 2. GET AHEAD — collected here, rendered AFTER recurring (see below) ──────
     const getAheadTasks = todayTasks.filter(t =>
-      t.type !== 'once' && t.dueDate && isGetAheadTask(t)
+      t.type !== 'once' && t.dueDate && isGetAheadTask(t) && !isDueOn(t, today)
     );
 
     // ── 3. RECURRING — sections with incomplete tasks first, fully-done sections last ──
-    const recurringTasks = todayTasks.filter(t => t.type !== 'once' && !isGetAheadTask(t));
+    // Tasks that are normally due today appear in recurring even if they have a dueDate
+    const recurringTasks = todayTasks.filter(t => t.type !== 'once' && (!isGetAheadTask(t) || isDueOn(t, today)));
     if (recurringTasks.length > 0) {
       // If OTO tasks shown above, add breathing room
       if (allOnceTasks.length > 0) {
@@ -2227,7 +2227,6 @@ function render() {
         });
       });
     }
-  }
 
   // ── Right column: today stats ─────────────────────────────────────────────
 
@@ -2270,6 +2269,8 @@ function render() {
       aBody.appendChild(row);
     });
   }
+  }
+}
   updateRightColumn(pct, doneCount, total, remaining, todayTasks, todayKey);
 }
 
