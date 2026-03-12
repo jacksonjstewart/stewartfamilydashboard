@@ -304,6 +304,24 @@
   .type-header.once-header.once-all-done { color: #4ade80; }
   .type-header.once-header.once-all-done::after { background: #1a3a1a; }
 
+  /* ── GET AHEAD block ── */
+  .type-header.ahead-header { color: #7a5a3a; }
+  .type-header.ahead-header::after { background: #2a1e10; }
+  .type-header.ahead-header.ahead-all-done { color: #f4a4b8; }
+  .type-header.ahead-header.ahead-all-done::after { background: #3a1a22; }
+  .task-row.ahead {
+    border-color: rgba(244,164,184,0.15);
+    background: rgba(244,164,184,0.03);
+  }
+  .task-row.ahead .task-name { color: #c8a8b0; }
+  .ahead-badge {
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    color: #7a4a58; background: rgba(244,164,184,0.08);
+    border: 1px solid rgba(244,164,184,0.15);
+    border-radius: 99px; padding: 2px 7px;
+    white-space: nowrap;
+  }
+
   /* ── OVERDUE OTO ── */
   .task-row.overdue {
     background: rgba(251,146,60,0.06);
@@ -905,6 +923,7 @@
               <option value="home">🏠 Household</option>
               <option value="vehicle">🚗 Vehicle</option>
               <option value="finance">💳 Finance</option>
+              <option value="family">🌸 Family</option>
             </select>
           </div>
           <div class="modal-field" style="flex:1">
@@ -1058,7 +1077,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.10.11 · pre-release</div>
+    <div id="version-tag">v0.11.0 · pre-release</div>
   </div>
   </div>
 
@@ -1120,6 +1139,7 @@ const SECTIONS = [
   { key:"home",    label:"Household", accent:"#4ade80" },
   { key:"vehicle", label:"Vehicle",   accent:"#e8e8e8" },
   { key:"finance", label:"Finance",   accent:"#facc15" },
+  { key:"family",  label:"Family",    accent:"#f4a4b8" },
 ];
 const CIRC = 2 * Math.PI * 100;
 
@@ -1251,6 +1271,52 @@ function isDueOn(task, d) {
   }
 }
 
+// ─── GET-AHEAD SYSTEM ────────────────────────────────────────────────────────
+// Tasks with a dueDate (MM-DD) surface 30 days before their annual deadline.
+// Tone: proactive opportunity, not urgent warning.
+const GET_AHEAD_LEAD_DAYS = 30;
+
+function parseDueDate(mmdd, refYear) {
+  // Parse MM-DD into a Date for the given year (or next year if past)
+  var parts = (mmdd || '').split('-');
+  if (parts.length !== 2) return null;
+  var m = parseInt(parts[0]), d = parseInt(parts[1]);
+  if (isNaN(m) || isNaN(d)) return null;
+  return new Date(refYear, m - 1, d, 0, 0, 0, 0);
+}
+
+function daysUntilDue(task) {
+  // Returns days until next annual due date, negative if past
+  if (!task.dueDate) return null;
+  var now   = new Date(todayKey + 'T00:00:00');
+  var year  = now.getFullYear();
+  var due   = parseDueDate(task.dueDate, year);
+  if (!due) return null;
+  // If due date already passed this year, look to next year
+  if (due < now) due = parseDueDate(task.dueDate, year + 1);
+  return Math.round((due - now) / 864e5);
+}
+
+function isGetAheadTask(task) {
+  // A get-ahead task is: has dueDate, not type=once, within lead window, not done today
+  if (!task.dueDate || task.type === 'once') return false;
+  var days = daysUntilDue(task);
+  if (days === null) return false;
+  // Surface within GET_AHEAD_LEAD_DAYS window, or if overdue (days < 0) — still actionable
+  return days <= GET_AHEAD_LEAD_DAYS;
+}
+
+function getAheadLabel(task) {
+  var days = daysUntilDue(task);
+  if (days === null) return '';
+  if (days < 0)  return 'OVERDUE';
+  if (days === 0) return 'DUE TODAY';
+  if (days === 1) return '1 DAY LEFT';
+  if (days <= 7)  return days + ' DAYS LEFT';
+  if (days <= 14) return '2 WEEKS';
+  return 'GET AHEAD';
+}
+
 function isDueToday(task, d) {
   if (task.type === 'once') {
     const dk  = dateKey(d);
@@ -1273,6 +1339,7 @@ function isDueToday(task, d) {
     return false;
   }
   if (pushForwardList.includes(task.id)) return true;
+  if (isGetAheadTask(task)) return true;  // surface in lead window
   return isDueOn(task, d);
 }
 
@@ -1409,6 +1476,7 @@ function parseCSV(text) {
       pushforward: (obj["pushforward"] || "").toLowerCase().trim(),
       type:        taskType,
       targetDate:  (obj["targetdate"] || "").trim(),
+      dueDate:     (obj["duedate"]    || "").trim(),  // MM-DD annual deadline for get-ahead
     };
   }).filter(t => (t.id || t.type === 'once') && t.name)
     .map(t => {
@@ -2077,11 +2145,52 @@ function render() {
       });
     }
 
-    // ── 2. RECURRING — sections with incomplete tasks first, fully-done sections last ──
-    const recurringTasks = todayTasks.filter(t => t.type !== 'once');
+    // ── 2. GET AHEAD — recurring tasks in their annual lead window ──────────────
+    const getAheadTasks = todayTasks.filter(t =>
+      t.type !== 'once' && t.dueDate && isGetAheadTask(t)
+    );
+    if (getAheadTasks.length > 0) {
+      if (allOnceTasks.length > 0 || getAheadTasks.length > 0) {
+        const sp = document.createElement('div'); sp.style.cssText = 'height:18px;'; listEl.appendChild(sp);
+      }
+      const allAheadDone = getAheadTasks.every(t => !!doneLog[t.id + '_' + todayKey]);
+      const aHdr = document.createElement('div');
+      aHdr.className = 'type-header ahead-header' + (allAheadDone ? ' ahead-all-done' : '');
+      aHdr.textContent = 'GET AHEAD';
+      listEl.appendChild(aHdr);
+      const sortedAhead = [...getAheadTasks].sort((a, b) => {
+        const ad = !!doneLog[a.id+'_'+todayKey], bd = !!doneLog[b.id+'_'+todayKey];
+        if (ad !== bd) return ad - bd; // incomplete first
+        // Sort by urgency — fewest days first
+        return (daysUntilDue(a) || 999) - (daysUntilDue(b) || 999);
+      });
+      sortedAhead.forEach(task => {
+        const isDone   = !!doneLog[task.id + '_' + todayKey];
+        const isCustom = customTasks.some(c => c.id === task.id);
+        const _dk      = task.id + '_' + todayKey;
+        const tempStamp = isDone ? 'Last completed ' + formatStamp(doneTs(_dk)||'', doneWho(_dk)||currentIdentity) : null;
+        const permEntry = permanentHistory[task.id];
+        const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
+          ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
+        const row = buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false);
+        row.classList.add('ahead');
+        // Inject urgency badge after emoji
+        if (!isDone) {
+          const badge = document.createElement('span');
+          badge.className = 'ahead-badge';
+          badge.textContent = getAheadLabel(task);
+          const nameEl = row.querySelector('.task-name');
+          if (nameEl && nameEl.parentNode) nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
+        }
+        listEl.appendChild(row);
+      });
+    }
+
+    // ── 3. RECURRING — sections with incomplete tasks first, fully-done sections last ──
+    const recurringTasks = todayTasks.filter(t => t.type !== 'once' && !isGetAheadTask(t));
     if (recurringTasks.length > 0) {
-      // If OTO tasks were shown above, add breathing room before first section
-      if (allOnceTasks.length > 0) {
+      // If OTO or get-ahead tasks shown above, add breathing room
+      if (allOnceTasks.length > 0 || getAheadTasks.length > 0) {
         const spacer = document.createElement("div");
         spacer.style.cssText = "height:18px;";
         listEl.appendChild(spacer);
