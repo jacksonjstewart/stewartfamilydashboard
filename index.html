@@ -1122,7 +1122,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.10 · pre-release</div>
+    <div id="version-tag">v0.11.11 · pre-release</div>
   </div>
   </div>
 
@@ -1729,14 +1729,16 @@ async function syncTodayState() {
     }
 
     // REMOVE: entries in local doneLog for today that are no longer in sheet
-    // Guard 1: skip taskIds currently being written (in-flight protection)
-    // Guard 2: skip all removals within 5s of any local toggle (rapid-click protection)
+    // Guard 1: skip taskIds currently being written (in-flight)
+    // Guard 2: never remove keys that were toggled ON by this device (_localOrigin)
+    //          — sheet may just not have confirmed yet (race condition)
+    // Guard 3: time-window protection for rapid clicks
     const sinceLastToggle = Date.now() - (_lastToggleTime || 0);
     if (sinceLastToggle > 12000) {
       Object.keys(doneLog).forEach(key => {
         if (!key.endsWith("_" + todayKey)) return;
         const taskId = key.replace("_" + todayKey, "");
-        if (!sheetChecked.has(taskId) && !_pendingWrites.has(taskId)) {
+        if (!sheetChecked.has(taskId) && !_pendingWrites.has(taskId) && !_localOrigin.has(key)) {
           delete doneLog[key];
           changed = true;
         }
@@ -1749,7 +1751,8 @@ async function syncTodayState() {
 
 // Write a single check to the Today sheet
 // Tracks taskIds currently being written — prevents sync from nuking in-flight checks
-const _pendingWrites = new Set();
+const _pendingWrites   = new Set();
+const _localOrigin    = new Set(); // keys toggled on THIS device — sync must never remove these
 
 async function writeCheckToSheet(taskId, completedAt) {
   _pendingWrites.add(taskId);
@@ -2137,9 +2140,11 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
 function renderInPlace() {
   const allTasks      = [...sheetTasks, ...customTasks];
   const todayTasks    = allTasks.filter(t => isDueToday(t, today));
-  // Core tasks = OTO + recurring due today (excludes pure get-ahead bonus tasks)
-  const coreTasks     = todayTasks.filter(t => t.type === 'once' || isDueOn(t, today));
+  // getAheadOnly = tasks surfaced purely by the get-ahead window, not genuinely due today
   const getAheadOnly  = todayTasks.filter(t => t.type !== 'once' && t.dueDate && isGetAheadTask(t) && !isDueOn(t, today));
+  // coreTasks = everything the user is expected to complete today (excludes bonus get-ahead)
+  const getAheadIds   = new Set(getAheadOnly.map(t => t.id));
+  const coreTasks     = todayTasks.filter(t => !getAheadIds.has(t.id));
   const total         = coreTasks.length;
   const doneCount     = coreTasks.filter(t => doneLog[t.id + "_" + todayKey]).length;
   const pct           = total === 0 ? 100 : Math.round((doneCount / total) * 100);
@@ -2178,9 +2183,11 @@ function renderInPlace() {
 function render() {
   const allTasks      = [...sheetTasks, ...customTasks];
   const todayTasks    = allTasks.filter(t => isDueToday(t, today));
-  // Core tasks = OTO + recurring due today (get-ahead bonus tasks excluded from ring/stats)
-  const coreTasks     = todayTasks.filter(t => t.type === 'once' || isDueOn(t, today));
+  // getAheadOnly = tasks surfaced purely by get-ahead window, not genuinely due today
   const getAheadOnly  = todayTasks.filter(t => t.type !== 'once' && t.dueDate && isGetAheadTask(t) && !isDueOn(t, today));
+  // coreTasks = everything expected today (OTO + recurring + push-forward), excludes bonus get-ahead
+  const getAheadIds   = new Set(getAheadOnly.map(t => t.id));
+  const coreTasks     = todayTasks.filter(t => !getAheadIds.has(t.id));
   const total         = coreTasks.length;
   const doneCount     = coreTasks.filter(t => doneLog[t.id + "_" + todayKey]).length;
   const pct           = total === 0 ? 100 : Math.round((doneCount / total) * 100);
@@ -2191,7 +2198,7 @@ function render() {
   const emptyEl = document.getElementById("empty-state");
   listEl.innerHTML = "";
 
-  if (total === 0 && sheetTasks.length > 0) {
+  if (todayTasks.length === 0 && sheetTasks.length > 0) {
     emptyEl.style.display = "block";
   } else {
     emptyEl.style.display = "none";
@@ -2890,18 +2897,20 @@ function setRange(days, btn) {
 let _reorderTimer  = null;
 let _lastToggleTime = 0;
 function toggleTask(id) {
-  _lastToggleTime = Date.now(); // stamp so sync won't remove in-flight state
+  _lastToggleTime = Date.now();
   const key = id + "_" + todayKey;
   if (doneLog[key]) {
     delete doneLog[key];
+    _localOrigin.delete(key); // unchecked locally — sync can now freely add/remove
     saveDone(doneLog);
-    renderInPlace(); // re-render without reordering
+    renderInPlace();
     writeUncheckToSheet(id);
   } else {
     const ts  = new Date().toISOString();
     doneLog[key] = { ts, who: currentIdentity };
+    _localOrigin.add(key); // checked locally — sync must never remove this
     saveDone(doneLog);
-    renderInPlace(); // green instantly, stay in place
+    renderInPlace();
     writeCheckToSheet(id, ts);
   }
   // Reorder after a short delay — satisfying rather than jarring
