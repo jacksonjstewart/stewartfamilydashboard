@@ -825,6 +825,28 @@
 
   #footer-note { display: none; }
 
+  /* ── BONUS GET AHEAD INDICATOR ── */
+  #bonus-indicator {
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    background: rgba(125,211,252,0.06);
+    border: 1px solid rgba(125,211,252,0.12);
+  }
+  .bonus-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 300;
+    color: #7dd3fc; line-height: 1;
+  }
+  .bonus-lbl {
+    font-size: 8px; font-weight: 600;
+    letter-spacing: 2px; color: #2a6a8a;
+  }
+
   /* ── RESPONSIVE ── */
   @media (max-width: 768px) {
     #app { grid-template-columns: 1fr; grid-template-rows: auto auto; }
@@ -1100,7 +1122,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.8 · pre-release</div>
+    <div id="version-tag">v0.11.9 · pre-release</div>
   </div>
   </div>
 
@@ -1144,6 +1166,10 @@
     </div>
 
     <div id="sec-bars"></div>
+    <div id="bonus-indicator" style="display:none">
+      <span class="bonus-val">+0</span>
+      <span class="bonus-lbl">GET AHEAD</span>
+    </div>
     <div id="footer-note">Syncs from Google Sheets · Resets daily · Tap to mark done</div>
     </div><!-- end right-main -->
   </div>
@@ -2109,12 +2135,16 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
 // ─── RENDER TODAY ─────────────────────────────────────────────────────────────
 // renderInPlace: updates check state visually without reordering tasks
 function renderInPlace() {
-  const allTasks   = [...sheetTasks, ...customTasks];
-  const todayTasks = allTasks.filter(t => isDueToday(t, today));
-  const total      = todayTasks.length;
-  const doneCount  = todayTasks.filter(t => doneLog[t.id + "_" + todayKey]).length;
-  const pct        = total === 0 ? 100 : Math.round((doneCount / total) * 100);
-  const remaining  = total - doneCount;
+  const allTasks      = [...sheetTasks, ...customTasks];
+  const todayTasks    = allTasks.filter(t => isDueToday(t, today));
+  // Core tasks = OTO + recurring due today (excludes pure get-ahead bonus tasks)
+  const coreTasks     = todayTasks.filter(t => t.type === 'once' || isDueOn(t, today));
+  const getAheadOnly  = todayTasks.filter(t => t.type !== 'once' && t.dueDate && isGetAheadTask(t) && !isDueOn(t, today));
+  const total         = coreTasks.length;
+  const doneCount     = coreTasks.filter(t => doneLog[t.id + "_" + todayKey]).length;
+  const pct           = total === 0 ? 100 : Math.round((doneCount / total) * 100);
+  const remaining     = total - doneCount;
+  const bonusDone     = getAheadOnly.filter(t => doneLog[t.id + "_" + todayKey]).length;
 
   // Update each existing task row's visual state without rebuilding DOM
   todayTasks.forEach(task => {
@@ -2142,16 +2172,20 @@ function renderInPlace() {
     if (fr) fr.className = 'task-freq' + (isDone ? ' stamped' : '');
   });
 
-  updateRightColumn(pct, doneCount, total, remaining, todayTasks, todayKey);
+  updateRightColumn(pct, doneCount, total, remaining, coreTasks, todayKey, bonusDone);
 }
 
 function render() {
-  const allTasks   = [...sheetTasks, ...customTasks];
-  const todayTasks = allTasks.filter(t => isDueToday(t, today));
-  const total      = todayTasks.length;
-  const doneCount  = todayTasks.filter(t => doneLog[t.id + "_" + todayKey]).length;
-  const pct        = total === 0 ? 100 : Math.round((doneCount / total) * 100);
-  const remaining  = total - doneCount;
+  const allTasks      = [...sheetTasks, ...customTasks];
+  const todayTasks    = allTasks.filter(t => isDueToday(t, today));
+  // Core tasks = OTO + recurring due today (get-ahead bonus tasks excluded from ring/stats)
+  const coreTasks     = todayTasks.filter(t => t.type === 'once' || isDueOn(t, today));
+  const getAheadOnly  = todayTasks.filter(t => t.type !== 'once' && t.dueDate && isGetAheadTask(t) && !isDueOn(t, today));
+  const total         = coreTasks.length;
+  const doneCount     = coreTasks.filter(t => doneLog[t.id + "_" + todayKey]).length;
+  const pct           = total === 0 ? 100 : Math.round((doneCount / total) * 100);
+  const remaining     = total - doneCount;
+  const bonusDone     = getAheadOnly.filter(t => doneLog[t.id + "_" + todayKey]).length;
 
   const listEl  = document.getElementById("task-list");
   const emptyEl = document.getElementById("empty-state");
@@ -2408,7 +2442,8 @@ function renderWeek() {
 }
 
 // ─── RIGHT COLUMN: TODAY ─────────────────────────────────────────────────────
-function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key) {
+function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key, bonusDone) {
+  bonusDone = bonusDone || 0;
   const rc = pct === 100 ? "#4ade80" : pct >= 60 ? "#a3e635" : pct >= 30 ? "#facc15" : "#f87171";
   const ringFill = document.getElementById("ring-fill");
   const wasFull  = ringFill.dataset.wasFull === "1";
@@ -2469,6 +2504,18 @@ function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key) {
     bar.innerHTML = `<div class="bar-meta"><span class="bar-name">${sec.label.toUpperCase()}</span><span class="bar-count">${sd}/${tasks.length}</span></div><div class="bar-track"><div class="bar-fill" style="width:${sp}%;background:${sec.accent}"></div></div>`;
     barsEl.appendChild(bar);
   });
+
+  // Bonus indicator — GET AHEAD completions (shown only when > 0)
+  const bonusEl = document.getElementById('bonus-indicator');
+  if (bonusEl) {
+    if (bonusDone > 0) {
+      bonusEl.style.display = 'flex';
+      bonusEl.querySelector('.bonus-val').textContent = '+' + bonusDone;
+      bonusEl.querySelector('.bonus-lbl').textContent = bonusDone === 1 ? 'GET AHEAD' : 'GET AHEAD';
+    } else {
+      bonusEl.style.display = 'none';
+    }
+  }
 
   // Top progress bar
   const fill = document.getElementById("top-bar-fill");
