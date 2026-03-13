@@ -450,13 +450,13 @@
     letter-spacing: 1.5px; transition: all 0.2s; white-space: nowrap;
   }
   #wr-peek-btn {
-    background: transparent; border: none; color: #2a2a2a;
-    cursor: pointer; padding: 0;
-    font-family: 'Outfit', sans-serif; font-size: 8px; font-weight: 600;
-    letter-spacing: 2px; transition: color 0.2s; white-space: nowrap;
+    background: transparent; border: 1px solid #1e1e1e; color: #383838;
+    border-radius: 8px; padding: 7px 14px; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
+    letter-spacing: 1.5px; transition: all 0.2s; white-space: nowrap;
     -webkit-tap-highlight-color: transparent;
   }
-  #wr-peek-btn:hover { color: #555; }
+  #wr-peek-btn:hover { border-color: #2e2e2e; color: #555; }
   #edit-btn:hover { border-color: #333; color: #888; }
 
   /* ── IDENTITY PICKER ── */
@@ -1414,10 +1414,10 @@
         </div>
         <div id="sync-status">LOADING…</div>
       </div>
-      <!-- Top right: add task + week review -->
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+      <!-- Top right: add task + progress -->
+      <div style="display:flex;flex-direction:column;align-items:stretch;gap:7px;">
         <button id="edit-btn" onclick="openTaskModal()">ADD TASK</button>
-        <button id="wr-peek-btn" onclick="showWeekReview()">THIS WEEK</button>
+        <button id="wr-peek-btn" onclick="showWeekReview()">PROGRESS</button>
       </div>
     </div>
 
@@ -3185,36 +3185,36 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
 
   // ── Show overlay ──────────────────────────────────────────────────────────
   const el = document.getElementById('weekly-report');
-  el.style.display = 'flex';
-  el.style.opacity = '0';
+
+  // Reset fully before showing
   el.classList.remove('visible');
+  el.style.display    = 'flex';
+  el.style.opacity    = '';
+  el.style.transition = '';
+  el.style.pointerEvents = '';
 
-  const inner = document.getElementById('wr-card');
-  inner.style.transition = 'none';
-  inner.style.transform  = 'translateY(16px)';
-
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    inner.style.transition = '';
+  // Let display:flex paint, then trigger transition
+  requestAnimationFrame(() => {
     setTimeout(() => {
       el.classList.add('visible');
-      // Animate section bars after card appears
+      // Animate section bars once card has faded in
       setTimeout(() => {
         el.querySelectorAll('.wr-sec-bar-fill').forEach((bar, i) => {
           setTimeout(() => { bar.style.width = bar.dataset.w; }, i * 80);
         });
-      }, 500);
-    }, delay || 0);
-  }));
+      }, 600);
+    }, delay ? delay : 40);
+  });
 
   // NOTED — clone to avoid stacking listeners
   const btn    = document.getElementById('wr-noted');
   const newBtn = btn.cloneNode(true);
   btn.parentNode.replaceChild(newBtn, btn);
   newBtn.addEventListener('click', () => {
-    el.style.transition    = 'opacity 0.6s cubic-bezier(0.4,0,0.2,1)';
-    el.style.opacity       = '0';
-    el.style.pointerEvents = 'none';
-    setTimeout(() => { el.style.display = 'none'; el.classList.remove('visible'); }, 650);
+    el.classList.remove('visible');
+    setTimeout(() => {
+      el.style.display = 'none';
+    }, 700);
   });
 }
 
