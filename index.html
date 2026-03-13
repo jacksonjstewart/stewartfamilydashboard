@@ -212,11 +212,11 @@
   #weather-wind { font-size: 10px; color: #444; letter-spacing: 0.3px; }
 
   #sync-status {
-    font-size: 9px; color: #333; letter-spacing: 1.5px;
+    font-size: 9px; color: #444; letter-spacing: 1.5px;
     margin-top: 6px; transition: color 0.4s;
   }
   #sync-status.syncing { color: #fb923c; }
-  #sync-status.ok      { color: #333; }
+  #sync-status.ok      { color: #444; }
   #sync-status.error   { color: #555; }
 
   /* ── NAV TABS ── */
@@ -531,7 +531,19 @@
     border-radius: 20px 20px 0 0; width: 100%; max-width: 700px;
     padding: 28px 28px 40px; display: flex; flex-direction: column; gap: 18px;
     animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
+    position: relative; overflow: hidden;
   }
+  #task-modal::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+  #task-modal > * { position: relative; z-index: 1; }
+  @keyframes taskFlash {
+    0%   { background: rgba(74,222,128,0.18); }
+    100% { background: rgba(74,222,128,0.04); }
+  }
+  .task-row.just-checked { animation: taskFlash 0.55s cubic-bezier(0.4,0,0.2,1) forwards; }
   @keyframes slideUp {
     from { transform: translateY(100%); opacity: 0; }
     to   { transform: translateY(0);    opacity: 1; }
@@ -635,7 +647,11 @@
     background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.05);
     transition: all 0.15s; -webkit-tap-highlight-color: transparent;
   }
-  .week-day:active { transform: scale(0.97); }
+  .week-day.past { opacity: 0.45; }
+  .week-day.today { border-color: rgba(250,204,21,0.25); }
+  .week-day.today .week-day-name,
+  .week-day.today .week-day-num { color: #facc15; }
+    .week-day:active { transform: scale(0.97); }
   .week-day.selected { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); }
   .week-day.heavy { border-color: rgba(251,146,60,0.2); }
   .week-day.heavy .week-day-num { color: #f87171; }
@@ -2819,6 +2835,7 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
   wrap.className = "task-wrap";
   wrap.dataset.taskId = task.id;
   const row = document.createElement("div");
+  row.dataset.id = task.id;
   const isOverdue = !isDone && isOnce && task.targetDate && isOTOOverdue(task);
   row.className = "task-row"
     + (isDone          ? " done"     : "")
@@ -3069,6 +3086,7 @@ function render() {
   }
   }
   updateRightColumn(pct, doneCount, total, remaining, coreTasks, todayKey, bonusDone);
+  animateTaskList(listEl);
 }
 
 // ─── RENDER WEEK ──────────────────────────────────────────────────────────────
@@ -3090,7 +3108,13 @@ function renderWeek() {
     const isSelected = i === selectedWeekDay;
 
     const card = document.createElement("div");
-    card.className = "week-day" + (isSelected ? " selected" : "") + (count >= 5 ? " heavy" : count >= 3 ? " moderate" : "");
+    const isPast = dk < dateKey(today);
+    const isToday = dk === dateKey(today);
+    card.className = "week-day"
+      + (isSelected ? " selected" : "")
+      + (count >= 5 ? " heavy" : count >= 3 ? " moderate" : "")
+      + (isPast ? " past" : "")
+      + (isToday ? " today" : "");
 
     // Section dots
     const dotsHTML = SECTIONS.map(sec => {
@@ -3814,23 +3838,20 @@ function updateRightColumn(pct, doneCount, total, remaining, coreTasks, key, bon
     svg.addEventListener("animationend", () => svg.classList.remove("pulse"), { once: true });
   } else if (pct < 100) { ringFill.dataset.wasFull = ""; }
 
-  // Motivate message — specific, not platitudes
+  // Motivate message — data-derived, no platitudes
   const msgEl = document.getElementById("motivate-msg");
   const subEl = document.getElementById("motivate-sub");
   if (total === 0) {
-    msgEl.textContent = "Rest easy."; msgEl.style.color = "#333";
-    subEl.textContent = "Nothing scheduled today";
+    msgEl.textContent = "Nothing due."; msgEl.style.color = "#333";
+    subEl.textContent = "No tasks scheduled today";
   } else if (pct === 100) {
-    msgEl.textContent = "House in order."; msgEl.style.color = "#4ade80";
-    subEl.textContent = doneCount + " task" + (doneCount !== 1 ? "s" : "") + " complete";
-  } else if (pct >= 60) {
-    msgEl.textContent = "Almost there."; msgEl.style.color = rc;
-    subEl.textContent = remaining + " left";
+    msgEl.textContent = doneCount + " / " + total; msgEl.style.color = "#4ade80";
+    subEl.textContent = "All done. Clean day.";
   } else if (pct > 0) {
-    msgEl.textContent = "Underway."; msgEl.style.color = rc;
-    subEl.textContent = doneCount + " done · " + remaining + " remaining";
+    msgEl.textContent = doneCount + " / " + total; msgEl.style.color = rc;
+    subEl.textContent = remaining + " task" + (remaining !== 1 ? "s" : "") + " remaining";
   } else {
-    msgEl.textContent = "Ready."; msgEl.style.color = "#f87171";
+    msgEl.textContent = "0 / " + total; msgEl.style.color = "#555";
     subEl.textContent = total + " task" + (total !== 1 ? "s" : "") + " today";
   }
 
@@ -4103,7 +4124,7 @@ function renderHistory() {
         <span class="history-bar-val">${hasData ? count : '—'}</span>
       </div>
       <div class="history-bar-track">
-        <div class="history-bar-fill" style="width:${hasData ? pct : 0}%;background:${sec.accent}"></div>
+        <div class="history-bar-fill" style="width:0;background:${sec.accent}" data-w="${hasData ? pct : 0}%"></div>
       </div>
     </div>`;
   }).join('');
@@ -4119,6 +4140,12 @@ function renderHistory() {
     <div class="stat-card-title" style="color:#1e1e1e;margin-bottom:10px">BY SECTION · ALL TIME</div>
     ${secBarsHTML}`;
   el.appendChild(analyticsCard);
+  // Animate history bars in after paint
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.querySelectorAll('.history-bar-fill').forEach((bar, i) => {
+      setTimeout(() => { bar.style.width = bar.dataset.w || '0%'; }, i * 60);
+    });
+  }));
 
   // ── TOP TASKS ─────────────────────────────────────────────────────────────
   const taskCounts = {}, taskMeta = {};
@@ -4267,6 +4294,9 @@ function toggleTask(id) {
     _localOrigin.add(key); // checked locally — sync must never remove this
     saveDone(doneLog);
     renderInPlace();
+    // Flash the row green briefly
+    const _flashRow = document.querySelector(`.task-row[data-id="${id}"]`);
+    if (_flashRow) { _flashRow.classList.add('just-checked'); setTimeout(() => _flashRow.classList.remove('just-checked'), 560); }
     writeCheckToSheet(id, ts);
   }
   // Reorder after a short delay — satisfying rather than jarring
