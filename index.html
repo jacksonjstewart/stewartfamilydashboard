@@ -660,7 +660,92 @@
   .week-no-tasks { font-size: 13px; color: #2a2a2a; font-style: italic; }
 
   /* ── HISTORY VIEW ── */
-  #history-range { display: flex; gap: 10px; margin-bottom: 32px; flex-wrap: wrap; }
+  /* ── HISTORY SUB-NAV ───────────────────────────────────────────────────── */
+  #history-subnav {
+    display: flex; gap: 0; margin-bottom: 24px;
+    border-bottom: 1px solid #181818;
+  }
+  .hist-tab {
+    background: none; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 9px;
+    font-weight: 700; letter-spacing: 2.5px; color: #2a2a2a;
+    padding: 0 0 10px; margin-right: 22px;
+    border-bottom: 1.5px solid transparent;
+    transition: color 0.2s;
+  }
+  .hist-tab.active { color: #e8e8e8; border-bottom-color: #e8e8e8; }
+  .hist-tab:hover:not(.active) { color: #555; }
+
+  #history-log-controls { display: flex; gap: 10px; margin-bottom: 32px; flex-wrap: wrap; }
+
+  /* Week/month review cards in History */
+  #wr-stored-list { display: flex; flex-direction: column; gap: 12px; }
+  .wr-stored-card {
+    background: #0c0c0c; border: 1px solid #1a1a1a;
+    border-radius: 12px; padding: 16px 20px;
+    cursor: pointer; transition: border-color 0.2s;
+  }
+  .wr-stored-card:hover { border-color: #2a2a2a; }
+  .wr-stored-card-header {
+    display: flex; align-items: baseline;
+    justify-content: space-between; margin-bottom: 10px;
+  }
+  .wr-stored-dates {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.5);
+  }
+  .wr-stored-adhere {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 300;
+    color: #e8e8e8; letter-spacing: -0.5px;
+  }
+  .wr-stored-adhere span {
+    font-size: 12px; color: #444; letter-spacing: 0; margin-left: 2px;
+  }
+  .wr-stored-stats {
+    display: flex; gap: 16px; margin-bottom: 10px;
+  }
+  .wr-stored-stat {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .wr-stored-stat-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px; font-weight: 300; color: rgba(255,255,255,0.5);
+    line-height: 1;
+  }
+  .wr-stored-stat-lbl {
+    font-family: 'Outfit', sans-serif;
+    font-size: 7px; font-weight: 600; letter-spacing: 1.5px; color: #333;
+  }
+  .wr-stored-secs {
+    display: flex; gap: 8px; align-items: center; margin-top: 6px;
+  }
+  .wr-stored-sec-pip {
+    width: 2px; height: 10px; border-radius: 99px; opacity: 0.6;
+  }
+  .wr-stored-sec-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 7.5px; font-weight: 600; letter-spacing: 1.5px; color: #333;
+  }
+  .wr-stored-sec-count {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.3);
+    margin-right: 6px;
+  }
+  .wr-stored-empty {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px; font-style: italic; color: #2a2a2a;
+    padding: 24px 0; text-align: center;
+  }
+  .wr-month-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px; font-weight: 700; letter-spacing: 3px;
+    color: #333; margin: 20px 0 10px;
+  }
+  .wr-month-label:first-child { margin-top: 0; }
+
+    #history-range { display: flex; gap: 10px; margin-bottom: 32px; flex-wrap: wrap; }
   .range-btn {
     background: none; border: 1px solid #1e1e1e; color: #333;
     border-radius: 8px; padding: 5px 12px; cursor: pointer;
@@ -1697,8 +1782,12 @@
 
     <!-- HISTORY VIEW -->
     <div id="view-history" style="display:none">
-      <div class="view-label">HISTORY</div>
-      <div id="history-range">
+      <div id="history-subnav">
+        <button class="hist-tab active" onclick="switchHistTab('log',this)">LOG</button>
+        <button class="hist-tab" onclick="switchHistTab('weeks',this)">WEEKS</button>
+        <button class="hist-tab" onclick="switchHistTab('months',this)">MONTHS</button>
+      </div>
+      <div id="history-log-controls">
         <button class="range-btn active" onclick="setRange(365,this)">THIS YEAR</button>
         <button class="range-btn" onclick="setRange(99999,this)">ALL TIME</button>
       </div>
@@ -2193,13 +2282,14 @@ async function fetchHistory() {
         permanentHistory[entry.taskId] = entry;
       }
     });
-    rawHistory  = entries;
-    rawOTOEvents = otoEvents;
-    try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory, oto: rawOTOEvents })); } catch(e) {}
+    rawHistory      = entries;
+    rawOTOEvents   = otoEvents;
+    rawWeeklyReports = Array.isArray(data.weeklyReports) ? data.weeklyReports : [];
+    try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory, oto: rawOTOEvents, wr: rawWeeklyReports })); } catch(e) {}
   } catch(err) {
     try {
       const c = JSON.parse(localStorage.getItem("hd_history_cache") || "null");
-      if (c) { permanentHistory = c.perm || {}; rawHistory = c.raw || []; rawOTOEvents = c.oto || []; }
+      if (c) { permanentHistory = c.perm || {}; rawHistory = c.raw || []; rawOTOEvents = c.oto || []; rawWeeklyReports = c.wr || []; }
     } catch(e) {}
   }
   if (currentView === 'history') renderHistory();
@@ -2415,6 +2505,7 @@ let doneLog          = loadDone();
 let permanentHistory = {};
 let rawHistory       = [];
 let rawOTOEvents     = [];
+let rawWeeklyReports = [];
 let pushForwardList  = loadPushFwd();
 
 // ── Identity ─────────────────────────────────────────────────────────────────
@@ -3389,6 +3480,101 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   });
 }
 
+// ─── WEEKLY REPORT PERSISTENCE ───────────────────────────────────────────────
+
+// Build a storable payload from entries + date range (pure calc, no DOM)
+function _buildWRPayload(entries, monDate, sunDate) {
+  const allTasks   = [...sheetTasks, ...customTasks];
+  const todayDk    = dateKey(new Date());
+  const nonPro     = entries.filter(e => !e.isProactive);
+  const proactive  = entries.filter(e => e.isProactive);
+  const onceIds    = new Set(allTasks.filter(t => t.type==='once').map(t=>t.id));
+  rawOTOEvents.forEach(e => { if (e.id) onceIds.add(e.id); });
+
+  // Past-days done + missed
+  let donePast = 0;
+  const missedIds = new Set();
+  for (let d = new Date(monDate); ; d.setDate(d.getDate()+1)) {
+    const dk = dateKey(d);
+    if (dk >= todayDk || dk > dateKey(sunDate)) break;
+    const dayDone = new Set(nonPro.filter(e => e.dateKey===dk).map(e=>e.taskId));
+    donePast += dayDone.size;
+    allTasks.filter(t => t.type!=='once' && isDueOn(t,d)).forEach(t => {
+      if (!dayDone.has(t.id)) missedIds.add(dk+'_'+t.id);
+    });
+  }
+  const missed = missedIds.size;
+  const total  = donePast + missed;
+  const pct    = total > 0 ? Math.round(donePast/total*100) : 0;
+
+  const secCounts = { home:0, vehicle:0, finance:0, family:0 };
+  nonPro.forEach(e => { if (secCounts[e.section]!==undefined) secCounts[e.section]++; });
+
+  // OTO this week
+  const wMon = dateKey(monDate), wEnd = dateKey(sunDate);
+  const otoSeen = new Set();
+  let otoCount = 0;
+  entries.filter(e => onceIds.has(e.taskId)).forEach(e => {
+    const k = e.taskId+'_'+e.dateKey;
+    if (!otoSeen.has(k)) { otoSeen.add(k); otoCount++; }
+  });
+  rawOTOEvents.filter(e =>
+    e.status==='completed' && e.completedAt &&
+    e.completedAt.slice(0,10) >= wMon && e.completedAt.slice(0,10) <= wEnd
+  ).forEach(e => {
+    const k = (e.id||e.name)+'_'+(e.dateKey||e.completedAt.slice(0,10));
+    if (!otoSeen.has(k)) { otoSeen.add(k); otoCount++; }
+  });
+
+  // ISO week key: YYYY-WNN based on Mon date
+  const jan4 = new Date(monDate.getFullYear(),0,4);
+  const wn   = Math.ceil(((monDate-jan4)/864e5 + jan4.getDay()+1)/7);
+  const weekKey = monDate.getFullYear()+'-W'+String(wn).padStart(2,'0');
+
+  return {
+    weekKey,
+    weekStart: dateKey(monDate),
+    weekEnd:   dateKey(sunDate),
+    done:      nonPro.length,
+    missed,
+    otoCount,
+    getAhead:  proactive.length,
+    secHome:    secCounts.home,
+    secVehicle: secCounts.vehicle,
+    secFinance: secCounts.finance,
+    secFamily:  secCounts.family,
+    adherencePct: pct,
+    storedAt:  new Date().toISOString()
+  };
+}
+
+// Save to sheet + update local cache
+async function _saveWeeklyReportToSheet(payload) {
+  try {
+    const res  = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'saveWeeklyReport', report: payload })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      // Update local rawWeeklyReports
+      const idx = rawWeeklyReports.findIndex(r => r.weekKey === payload.weekKey);
+      if (idx >= 0) rawWeeklyReports[idx] = payload;
+      else rawWeeklyReports.push(payload);
+      // Persist to cache
+      try {
+        const c = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
+        c.wr = rawWeeklyReports;
+        localStorage.setItem('hd_history_cache', JSON.stringify(c));
+      } catch(e) {}
+      console.log('Weekly report saved:', payload.weekKey);
+    }
+  } catch(err) {
+    console.warn('Weekly report save failed:', err);
+  }
+}
+
 // Monday auto-show — last completed week
 function buildWeeklyReport() {
   const now = new Date();
@@ -3404,7 +3590,10 @@ function buildWeeklyReport() {
   const prevSun = new Date(prevMon); prevSun.setDate(prevMon.getDate()+6); prevSun.setHours(23,59,59,999);
   const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
   const entries = rawHistory.filter(e => e.dateKey >= dateKey(prevMon) && e.dateKey <= dateKey(prevSun));
+  const wReport = _buildWRPayload(entries, prevMon, prevSun);
   _renderWeekReport(entries, fmt(prevMon) + ' — ' + fmt(prevSun), 1600, prevMon, prevSun);
+  // Save to sheet asynchronously — don't block the display
+  _saveWeeklyReportToSheet(wReport);
 }
 
 // Manual peek — current week in progress, never touches Monday key
@@ -3419,6 +3608,191 @@ function showWeekReview() {
   _renderWeekReport(entries, label, 0, curMon, now);
 }
 
+
+// ─── HISTORY SUB-NAV ──────────────────────────────────────────────────────────
+
+let histTab = 'log'; // 'log' | 'weeks' | 'months'
+
+function switchHistTab(tab, btn) {
+  histTab = tab;
+  document.querySelectorAll('.hist-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const logControls = document.getElementById('history-log-controls');
+  if (logControls) logControls.style.display = tab === 'log' ? 'flex' : 'none';
+  if (tab === 'log')    renderHistory();
+  if (tab === 'weeks')  renderWeeks();
+  if (tab === 'months') renderMonths();
+}
+
+// ── Shared card builder ────────────────────────────────────────────────────────
+function _wrStoredCardHTML(r, clickPayload) {
+  const secDefs = [
+    { key:'secHome',    label:'HOUSEHOLD', accent:'#4ade80' },
+    { key:'secVehicle', label:'VEHICLE',   accent:'#e8e8e8' },
+    { key:'secFinance', label:'FINANCE',   accent:'#facc15' },
+    { key:'secFamily',  label:'FAMILY',    accent:'#f4a4b8' },
+  ];
+  const secHTML = secDefs
+    .filter(s => (r[s.key]||0) > 0)
+    .map(s => `
+      <div class="wr-stored-sec-pip" style="background:${s.accent}"></div>
+      <span class="wr-stored-sec-count">${r[s.key]}</span>
+      <span class="wr-stored-sec-label">${s.label}</span>`)
+    .join('');
+
+  const total = (r.done||0) + (r.missed||0);
+  const pctDisplay = total > 0 ? r.adherencePct + '%' : '—';
+
+  return `
+    <div class="wr-stored-card-header">
+      <div class="wr-stored-dates">${_formatStoredDates(r.weekStart, r.weekEnd)}</div>
+      <div class="wr-stored-adhere">${pctDisplay}<span>adherence</span></div>
+    </div>
+    <div class="wr-stored-stats">
+      <div class="wr-stored-stat">
+        <div class="wr-stored-stat-val" style="color:#4ade80">${r.done||0}</div>
+        <div class="wr-stored-stat-lbl">DONE</div>
+      </div>
+      <div class="wr-stored-stat">
+        <div class="wr-stored-stat-val" style="color:${(r.missed||0)>0?'#f87171':'#333'}">${r.missed||0}</div>
+        <div class="wr-stored-stat-lbl">MISSED</div>
+      </div>
+      <div class="wr-stored-stat">
+        <div class="wr-stored-stat-val" style="color:${(r.otoCount||0)>0?'#facc15':'#333'}">${r.otoCount||0}</div>
+        <div class="wr-stored-stat-lbl">ONE TIME</div>
+      </div>
+      <div class="wr-stored-stat">
+        <div class="wr-stored-stat-val" style="color:${(r.getAhead||0)>0?'#7dd3fc':'#333'}">${r.getAhead||0}</div>
+        <div class="wr-stored-stat-lbl">GET AHEAD</div>
+      </div>
+    </div>
+    ${secHTML ? `<div class="wr-stored-secs">${secHTML}</div>` : ''}`;
+}
+
+function _formatStoredDates(startDk, endDk) {
+  const fmt = dk => {
+    if (!dk) return '—';
+    const d = new Date(dk + 'T00:00:00');
+    return DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
+  };
+  return fmt(startDk) + ' — ' + fmt(endDk);
+}
+
+// ── WEEKS view ────────────────────────────────────────────────────────────────
+function renderWeeks() {
+  const el = document.getElementById('history-content');
+  el.innerHTML = '';
+
+  const list = document.createElement('div');
+  list.id = 'wr-stored-list';
+
+  const sorted = [...rawWeeklyReports].sort((a,b) => b.weekKey.localeCompare(a.weekKey));
+
+  if (!sorted.length) {
+    list.innerHTML = '<div class="wr-stored-empty">No weekly reports stored yet.<br>Reports save automatically each Monday.</div>';
+    el.appendChild(list);
+    return;
+  }
+
+  sorted.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'wr-stored-card';
+    card.innerHTML = _wrStoredCardHTML(r);
+    // Click to re-open the full week review overlay
+    card.addEventListener('click', () => {
+      const monDate = new Date(r.weekStart + 'T00:00:00');
+      const sunDate = new Date(r.weekEnd   + 'T00:00:00');
+      const entries = rawHistory.filter(e => e.dateKey >= r.weekStart && e.dateKey <= r.weekEnd);
+      const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
+      _renderWeekReport(entries, fmt(monDate) + ' — ' + fmt(sunDate), 0, monDate, sunDate);
+    });
+    list.appendChild(card);
+  });
+
+  el.appendChild(list);
+}
+
+// ── MONTHS view ───────────────────────────────────────────────────────────────
+function renderMonths() {
+  const el = document.getElementById('history-content');
+  el.innerHTML = '';
+
+  if (!rawWeeklyReports.length) {
+    el.innerHTML = '<div class="wr-stored-empty">No weekly reports stored yet.<br>Month summaries will appear here automatically.</div>';
+    return;
+  }
+
+  // Aggregate weekly reports into months (by weekStart month)
+  const monthMap = {};
+  rawWeeklyReports.forEach(r => {
+    if (!r.weekStart) return;
+    const d    = new Date(r.weekStart + 'T00:00:00');
+    const mKey = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if (!monthMap[mKey]) monthMap[mKey] = {
+      mKey, year: d.getFullYear(), month: d.getMonth(),
+      weekStart: r.weekStart, weekEnd: r.weekEnd,
+      done:0, missed:0, otoCount:0, getAhead:0,
+      secHome:0, secVehicle:0, secFinance:0, secFamily:0, weeks: []
+    };
+    const m = monthMap[mKey];
+    m.done      += r.done||0;
+    m.missed    += r.missed||0;
+    m.otoCount  += r.otoCount||0;
+    m.getAhead  += r.getAhead||0;
+    m.secHome   += r.secHome||0;
+    m.secVehicle+= r.secVehicle||0;
+    m.secFinance+= r.secFinance||0;
+    m.secFamily += r.secFamily||0;
+    if (r.weekEnd > m.weekEnd) m.weekEnd = r.weekEnd;
+    m.weeks.push(r);
+  });
+
+  const sorted = Object.values(monthMap).sort((a,b) => b.mKey.localeCompare(a.mKey));
+  const list   = document.createElement('div');
+  list.id = 'wr-stored-list';
+
+  sorted.forEach(m => {
+    const total = m.done + m.missed;
+    const pct   = total > 0 ? Math.round(m.done / total * 100) : 0;
+    m.adherencePct = pct;
+
+    const label = document.createElement('div');
+    label.className = 'wr-month-label';
+    label.textContent = MONTHS[m.month].toUpperCase() + ' ' + m.year + ' · ' + m.weeks.length + ' WEEK' + (m.weeks.length!==1?'S':'');
+    list.appendChild(label);
+
+    const card = document.createElement('div');
+    card.className = 'wr-stored-card';
+    card.innerHTML = _wrStoredCardHTML(m);
+    // Click to expand sub-list of weekly cards for that month
+    let expanded = false;
+    const subList = document.createElement('div');
+    subList.style.cssText = 'margin-top:12px;display:none;flex-direction:column;gap:8px;';
+    m.weeks.sort((a,b) => b.weekKey.localeCompare(a.weekKey)).forEach(wr => {
+      const sub = document.createElement('div');
+      sub.className = 'wr-stored-card';
+      sub.style.cssText = 'margin:0;border-color:#151515;background:#090909;';
+      sub.innerHTML = _wrStoredCardHTML(wr);
+      sub.addEventListener('click', e => {
+        e.stopPropagation();
+        const monDate = new Date(wr.weekStart+'T00:00:00');
+        const sunDate = new Date(wr.weekEnd+'T00:00:00');
+        const entries = rawHistory.filter(e => e.dateKey >= wr.weekStart && e.dateKey <= wr.weekEnd);
+        const fmt = d => DAYS[d.getDay()].slice(0,3)+' '+MONTHS[d.getMonth()].slice(0,3)+' '+d.getDate()+', '+d.getFullYear();
+        _renderWeekReport(entries, fmt(monDate)+' — '+fmt(sunDate), 0, monDate, sunDate);
+      });
+      subList.appendChild(sub);
+    });
+    card.addEventListener('click', () => {
+      expanded = !expanded;
+      subList.style.display = expanded ? 'flex' : 'none';
+    });
+    list.appendChild(card);
+    list.appendChild(subList);
+  });
+
+  el.appendChild(list);
+}
 
 // ─── RIGHT COLUMN: TODAY ─────────────────────────────────────────────────────
 function updateRightColumn(pct, doneCount, total, remaining, coreTasks, key, bonusDone) {
@@ -3859,7 +4233,16 @@ function switchView(view) {
   document.getElementById("edit-btn").style.display     = view === 'today'   ? 'block' : 'none';
   if (view === 'today')   render();
   if (view === 'week')    renderWeek();
-  if (view === 'history') renderHistory();
+  if (view === 'history') {
+    // Always reset to LOG tab when entering History
+    histTab = 'log';
+    document.querySelectorAll('.hist-tab').forEach(b => b.classList.remove('active'));
+    const logTab = document.querySelector('.hist-tab[onclick*="log"]');
+    if (logTab) logTab.classList.add('active');
+    const logControls = document.getElementById('history-log-controls');
+    if (logControls) logControls.style.display = 'flex';
+    renderHistory();
+  }
 }
 function setRange(days, btn) {
   historyRangeDays = days;
