@@ -1101,6 +1101,96 @@
     animation: taskIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
   }
 
+
+  /* ── WEEKLY REPORT ──────────────────────────────────────────────────────── */
+  #weekly-report {
+    position: fixed; inset: 0; z-index: 9998;
+    background: #060606;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity 0.7s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+  }
+  #weekly-report.visible {
+    opacity: 1; pointer-events: all;
+  }
+  #wr-inner {
+    display: inline-flex; flex-direction: column;
+    align-items: flex-start;
+    opacity: 0; transform: translateY(14px);
+    transition: opacity 1.0s ease 0.2s, transform 1.0s cubic-bezier(0.16,1,0.3,1) 0.2s;
+  }
+  #weekly-report.visible #wr-inner {
+    opacity: 1; transform: translateY(0);
+  }
+  #wr-eyebrow {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px; font-weight: 600; letter-spacing: 5px;
+    color: rgba(255,255,255,0.2);
+    margin-bottom: 14px;
+  }
+  #wr-dates {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.35); letter-spacing: 0.5px;
+    margin-bottom: 18px;
+  }
+  #wr-rule {
+    width: 100%; height: 1px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.12), transparent);
+    margin-bottom: 32px;
+  }
+  #wr-number {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 86px; font-weight: 300;
+    color: #ffffff; letter-spacing: -3px; line-height: 0.9;
+    margin-bottom: 6px;
+  }
+  #wr-number span {
+    font-size: 22px; letter-spacing: 0; color: rgba(255,255,255,0.3);
+    font-weight: 300; margin-left: 4px;
+  }
+  #wr-sections {
+    display: flex; flex-direction: column; gap: 10px;
+    width: 100%; margin-top: 24px; margin-bottom: 32px;
+  }
+  .wr-sec-row {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .wr-sec-pip {
+    width: 2px; height: 12px; border-radius: 99px; flex-shrink: 0; opacity: 0.7;
+  }
+  .wr-sec-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px; font-weight: 600; letter-spacing: 2.5px;
+    color: #444; flex: 1;
+  }
+  .wr-sec-count {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 300; color: rgba(255,255,255,0.5);
+    letter-spacing: -0.5px; line-height: 1;
+  }
+  #wr-line {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.25); letter-spacing: 0.2px;
+    line-height: 1.4; margin-bottom: 40px;
+    border-top: 1px solid #111; padding-top: 20px;
+    width: 100%;
+  }
+  #wr-noted {
+    align-self: flex-end;
+    background: none; border: 1px solid #222; border-radius: 4px;
+    color: rgba(255,255,255,0.3); cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px; font-weight: 600; letter-spacing: 4px;
+    padding: 10px 20px;
+    transition: border-color 0.2s, color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #wr-noted:hover { border-color: #444; color: rgba(255,255,255,0.6); }
+  #wr-noted:active { transform: scale(0.97); }
+
 </style>
 </head>
 <body>
@@ -1115,6 +1205,19 @@
   </div>
   <div id="splash-rule"></div>
   <div id="splash-sub">STEWARD · v1.0</div>
+</div>
+
+<!-- ── WEEKLY REPORT ──────────────────────────────────────────────────────── -->
+<div id="weekly-report" style="display:none;">
+  <div id="wr-inner">
+    <div id="wr-eyebrow">WEEK IN REVIEW</div>
+    <div id="wr-dates"></div>
+    <div id="wr-rule"></div>
+    <div id="wr-number"></div>
+    <div id="wr-sections"></div>
+    <div id="wr-line"></div>
+    <button id="wr-noted">NOTED</button>
+  </div>
 </div>
 
 <div id="offline-banner">⚠ NO CONNECTION — changes will not be saved until you're back online</div>
@@ -2765,6 +2868,99 @@ function renderWeek() {
   });
 }
 
+
+// ─── WEEKLY REPORT ────────────────────────────────────────────────────────────
+function buildWeeklyReport() {
+  // Only on Mondays — first open this week
+  const now  = new Date();
+  const dow  = now.getDay(); // 0=Sun, 1=Mon
+  if (dow !== 1) return;   // Monday only
+
+  // Key: steward_wr_YYYY-WNN  (ISO week)
+  const jan4     = new Date(now.getFullYear(), 0, 4);
+  const weekNum  = Math.ceil(((now - jan4) / 864e5 + jan4.getDay() + 1) / 7);
+  const WR_KEY   = 'steward_wr_' + now.getFullYear() + '-W' + String(weekNum).padStart(2,'0');
+  if (localStorage.getItem(WR_KEY)) return; // already seen this week
+  localStorage.setItem(WR_KEY, '1');
+
+  // Previous Mon→Sun (the completed week)
+  const prevMon = new Date(now); prevMon.setDate(now.getDate() - 7);
+  prevMon.setHours(0,0,0,0);
+  const prevSun = new Date(prevMon); prevSun.setDate(prevMon.getDate() + 6);
+  prevSun.setHours(23,59,59,999);
+
+  const prevMonKey = dateKey(prevMon);
+  const prevSunKey = dateKey(prevSun);
+
+  // Filter rawHistory to that week
+  const weekEntries = rawHistory.filter(e =>
+    e.dateKey >= prevMonKey && e.dateKey <= prevSunKey
+  );
+
+  const total = weekEntries.length;
+
+  // Section counts
+  const secCounts = {};
+  SECTIONS.forEach(s => { secCounts[s.key] = 0; });
+  weekEntries.forEach(e => { if (secCounts[e.section] !== undefined) secCounts[e.section]++; });
+
+  // One-line observation — purely factual, derived from data
+  const topSec  = SECTIONS.slice().sort((a,b) => secCounts[b.key] - secCounts[a.key])[0];
+  const allZero = SECTIONS.every(s => secCounts[s.key] === 0);
+  let line = '';
+  if (total === 0) {
+    line = 'No tasks recorded for the week.';
+  } else {
+    const uniqueDays = new Set(weekEntries.map(e => e.dateKey)).size;
+    if (uniqueDays === 7) {
+      line = 'Tasks completed every day of the week.';
+    } else if (secCounts[topSec.key] > 0 && secCounts[topSec.key] === total) {
+      line = topSec.label + ' was the only active section.';
+    } else if (secCounts[topSec.key] > 0) {
+      const pct = Math.round(secCounts[topSec.key] / total * 100);
+      line = topSec.label + ' led the week at ' + pct + '%.';
+    } else {
+      line = uniqueDays + ' of 7 days had recorded tasks.';
+    }
+  }
+
+  // Date label: "Mon Mar 10 — Sun Mar 16"
+  const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate();
+  const dateLabel = fmt(prevMon) + ' — ' + fmt(prevSun);
+
+  // Populate DOM
+  document.getElementById('wr-dates').textContent  = dateLabel;
+  document.getElementById('wr-number').innerHTML   =
+    total + '<span>task' + (total !== 1 ? 's' : '') + '</span>';
+  document.getElementById('wr-line').textContent   = line;
+
+  const secEl = document.getElementById('wr-sections');
+  secEl.innerHTML = '';
+  SECTIONS.forEach(sec => {
+    if (secCounts[sec.key] === 0) return;
+    const row = document.createElement('div');
+    row.className = 'wr-sec-row';
+    row.innerHTML = `
+      <div class="wr-sec-pip" style="background:${sec.accent}"></div>
+      <div class="wr-sec-label">${sec.label.toUpperCase()}</div>
+      <div class="wr-sec-count">${secCounts[sec.key]}</div>`;
+    secEl.appendChild(row);
+  });
+
+  // Show with delay after splash clears
+  const el = document.getElementById('weekly-report');
+  el.style.display = 'flex';
+  setTimeout(() => el.classList.add('visible'), 1600);
+
+  // NOTED button
+  document.getElementById('wr-noted').addEventListener('click', () => {
+    el.style.transition = 'opacity 0.6s cubic-bezier(0.4,0,0.2,1)';
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
+    setTimeout(() => { el.style.display = 'none'; }, 650);
+  });
+}
+
 // ─── RIGHT COLUMN: TODAY ─────────────────────────────────────────────────────
 function updateRightColumn(pct, doneCount, total, remaining, coreTasks, key, bonusDone) {
   // coreTasks = OTO + recurring due today ONLY. Get-ahead bonus tasks excluded.
@@ -3446,7 +3642,7 @@ try {
 syncFromSheet(); // catch-up runs inside after first sync
 restoreIdentityUI(); // restore identity button state
 syncTodayState(); // immediate cross-device state sync on load
-fetchHistory();
+fetchHistory().then(() => buildWeeklyReport());
 fetchWeather();
 setInterval(syncFromSheet, SYNC_MS);
 setInterval(syncTodayState, 15 * 1000); // sync checked state every 15s
