@@ -76,7 +76,7 @@
   }
 
   #left {
-    padding: 32px 32px;
+    padding: 36px 36px 32px;
     border-right: 1px solid #111;
     overflow-y: auto;
     display: flex;
@@ -173,18 +173,18 @@
   /* ── CLOCK ── */
   #clock-day {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 64px; font-weight: 300; color: #ffffff;
-    line-height: 1; letter-spacing: -2px;
+    font-size: 76px; font-weight: 300; color: #ffffff;
+    line-height: 1; letter-spacing: -2.5px;
   }
   /* Second row: date + divider + weather side by side */
   #clock-row2 {
-    display: flex; align-items: baseline; gap: 18px; margin-top: 6px; flex-wrap: wrap;
+    display: flex; align-items: baseline; gap: 18px; margin-top: 8px; flex-wrap: wrap;
   }
   #clock-date {
-    font-size: 18px; font-weight: 400; color: #bbb; letter-spacing: 0.2px;
+    font-size: 21px; font-weight: 400; color: #bbb; letter-spacing: 0.2px;
   }
   #clock-time {
-    font-size: 15px; font-weight: 400; color: #777; letter-spacing: 1.5px;
+    font-size: 17px; font-weight: 400; color: #777; letter-spacing: 1.5px;
   }
   #clock-time span { font-size: 15px; color: #666; margin-left: 1px; letter-spacing: 1px; }
 
@@ -202,8 +202,8 @@
   #weather-widget.loaded { opacity: 1; }
   #weather-temp {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 40px; font-weight: 300; color: #cccccc;
-    line-height: 1; letter-spacing: -1px;
+    font-size: 46px; font-weight: 300; color: #cccccc;
+    line-height: 1; letter-spacing: -1.5px;
   }
   #weather-temp span { font-size: 16px; color: #555; letter-spacing: 0; }
   #weather-info { display: flex; flex-direction: column; gap: 1px; }
@@ -226,9 +226,9 @@
   }
   .nav-btn {
     background: none; border: none; cursor: pointer;
-    font-family: 'Outfit', sans-serif; font-size: 9px;
+    font-family: 'Outfit', sans-serif; font-size: 10px;
     font-weight: 700; letter-spacing: 2.5px; color: #2a2a2a;
-    padding: 0 0 10px 0; margin-right: 24px;
+    padding: 0 0 12px 0; margin-right: 28px;
     transition: color 0.2s;
     border-bottom: 1.5px solid transparent;
     margin-bottom: -1px;
@@ -240,14 +240,14 @@
   /* ── SECTION HEADER ── */
   .section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; margin-top: 20px; }
   .section-pip { width: 2.5px; height: 14px; border-radius: 99px; opacity: 0.8; }
-  .section-label { font-size: 9px; font-weight: 700; color: #666; letter-spacing: 3px; }
+  .section-label { font-size: 10px; font-weight: 700; color: #666; letter-spacing: 3px; }
   .section-count { font-size: 10px; color: #444; margin-left: auto; letter-spacing: 1px; }
 
   /* ── TASK ROW ── */
   .task-row {
     display: flex; align-items: center; gap: 13px;
-    padding: 12px 16px; border-radius: 10px; cursor: pointer;
-    margin-bottom: 4px;
+    padding: 14px 16px; border-radius: 11px; cursor: pointer;
+    margin-bottom: 5px;
     background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.055);
     transition: background 0.15s, border-color 0.15s, transform 0.1s;
@@ -259,7 +259,7 @@
   .task-row.readonly { cursor: default; }
   .task-row.readonly:active { transform: none; }
   .task-checkbox {
-    width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
     border: 1.5px solid #252525; background: transparent;
     display: flex; align-items: center; justify-content: center; transition: all 0.2s;
   }
@@ -268,9 +268,9 @@
   .task-row.done .task-checkbox svg { display: block; }
   .task-emoji { font-size: 16px; flex-shrink: 0; transition: opacity 0.2s; }
   .task-row.done .task-emoji { opacity: 0.35; }
-  .task-name { font-size: 13.5px; color: #d8d8d8; transition: color 0.2s; line-height: 1.35; font-weight: 400; }
+  .task-name { font-size: 14.5px; color: #d8d8d8; transition: color 0.2s; line-height: 1.35; font-weight: 400; }
   .task-row.done .task-name { color: #252525; text-decoration: line-through; text-decoration-color: #333; }
-  .task-freq { font-size: 10.5px; color: #3a3a3a; margin-top: 2px; letter-spacing: 0.2px; }
+  .task-freq { font-size: 11.5px; color: #3a3a3a; margin-top: 2px; letter-spacing: 0.2px; }
   .task-row.done .task-freq { color: #2a3a2a; }
   .task-freq.stamped { color: #3a5a3a; }
   .carry-dot {
@@ -1021,16 +1021,157 @@
     .stat-val  { font-size: 32px; }
   }
 
+
+  /* ── SPLASH SCREEN ────────────────────────────────────────────────────────── */
+  #splash {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #080808;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: all;
+    opacity: 1;
+    transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #splash.fade-out { opacity: 0; pointer-events: none; }
+  #splash.gone { display: none; }
+  #splash-inner {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 0;
+    animation: splashReveal 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes splashReveal {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  #splash-s {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 120px; font-weight: 300; font-style: italic;
+    color: #ffffff; line-height: 1;
+    letter-spacing: -4px;
+    margin-bottom: 18px;
+  }
+  #splash-rule {
+    width: 48px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+    margin-bottom: 18px;
+  }
+  #splash-name {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 6px; color: rgba(255,255,255,0.5);
+    margin-bottom: 6px;
+  }
+  #splash-sub {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px; font-weight: 300; font-style: italic;
+    letter-spacing: 1px; color: rgba(255,255,255,0.2);
+  }
+
+  /* ── TASK ENTRY ANIMATIONS ────────────────────────────────────────────────── */
+  @keyframes taskFadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .task-wrap.animate-in {
+    animation: taskFadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .section-header.animate-in {
+    animation: taskFadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+
+  /* ── SPLASH SCREEN ──────────────────────────────────────────────── */
+  #splash {
+    position: fixed; inset: 0; z-index: 10000;
+    background: #060606;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: all;
+    transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #splash.fading { opacity: 0; pointer-events: none; }
+
+  #splash-wordmark {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 0;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.9s ease, transform 0.9s ease;
+  }
+  #splash-wordmark.visible { opacity: 1; transform: translateY(0); }
+
+  #splash-the {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.4); letter-spacing: 5px;
+    margin-bottom: 4px;
+  }
+  #splash-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 72px; font-weight: 300;
+    color: #ffffff; letter-spacing: -2px; line-height: 0.92;
+  }
+  #splash-family {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 300;
+    color: rgba(255,255,255,0.5); letter-spacing: 6px;
+    align-self: flex-end; margin-right: 2px;
+    margin-top: 2px;
+  }
+  #splash-rule {
+    width: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    margin-top: 22px;
+    transition: width 1.0s cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
+  }
+  #splash-rule.visible { width: 160px; }
+  #splash-sub {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px; font-weight: 400; letter-spacing: 4px;
+    color: rgba(255,255,255,0.18); margin-top: 14px;
+    opacity: 0; transition: opacity 0.8s ease 0.7s;
+  }
+  #splash-sub.visible { opacity: 1; }
+
+  /* Task entry animation */
+  .task-row {
+    animation: none;
+  }
+  @keyframes taskIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .task-row.animating {
+    animation: taskIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
 </style>
 </head>
 <body>
+<div id="splash">
+  <div id="splash-inner">
+    <div id="splash-s">S</div>
+    <div id="splash-rule"></div>
+    <div id="splash-name">STEWARD</div>
+    <div id="splash-sub">Stewart Family</div>
+  </div>
+</div>
+<div id="splash">
+  <div id="splash-wordmark">
+    <div id="splash-the">the</div>
+    <div id="splash-name">Stewart</div>
+    <div id="splash-family">Family</div>
+  </div>
+  <div id="splash-rule"></div>
+  <div id="splash-sub">STEWARD · v1.0</div>
+</div>
+
 <div id="offline-banner">⚠ NO CONNECTION — changes will not be saved until you're back online</div>
 <div id="top-bar"><div id="top-bar-fill"></div></div>
 <div id="app">
 
   <div id="left">
     <!-- Header -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px;">
       <!-- Left: full clock + inline weather -->
       <div>
         <div id="clock-day">Monday</div>
@@ -1319,6 +1460,86 @@
 </div>
 
 <script>
+// ─── SPLASH SCREEN ────────────────────────────────────────────────────────────
+// Shows once per calendar day per device. Graceful: if todayKey isn't
+// available yet we derive it inline here.
+(function() {
+  var _td = new Date();
+  var _tk = _td.getFullYear() + '-' +
+            String(_td.getMonth()+1).padStart(2,'0') + '-' +
+            String(_td.getDate()).padStart(2,'0');
+  var _key = 'hd_splash_' + _tk;
+  var _splash = document.getElementById('splash');
+  if (!_splash) return;
+
+  var _seen = false;
+  try { _seen = !!localStorage.getItem(_key); } catch(e) {}
+
+  if (_seen) {
+    // Already shown today — remove instantly, no flash
+    _splash.style.display = 'none';
+    return;
+  }
+
+  // Mark seen immediately so reloads within the day skip it
+  try { localStorage.setItem(_key, '1'); } catch(e) {}
+
+  // Sequence: wordmark fades in → rule draws → sub appears → pause → fade out
+  var _wm   = document.getElementById('splash-wordmark');
+  var _rule = document.getElementById('splash-rule');
+  var _sub  = document.getElementById('splash-sub');
+
+  // Step 1: wordmark in (starts immediately, CSS handles the transition)
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      if (_wm)   _wm.classList.add('visible');
+      if (_rule) _rule.classList.add('visible');
+    });
+  });
+
+  // Step 2: sub appears (CSS transition-delay handles timing)
+  setTimeout(function() {
+    if (_sub) _sub.classList.add('visible');
+  }, 50);
+
+  // Step 3: hold, then fade to reveal app
+  setTimeout(function() {
+    _splash.classList.add('fading');
+    setTimeout(function() {
+      _splash.style.display = 'none';
+    }, 750);
+  }, 2000);
+})();
+
+
+// ── SPLASH SCREEN ─────────────────────────────────────────────────────────────
+(function() {
+  const TODAY_KEY = 'steward_splash_' + new Date().toISOString().slice(0,10);
+  const splashEl  = document.getElementById('splash');
+  if (!splashEl) return;
+
+  // Check if already shown today on this device
+  const alreadySeen = localStorage.getItem(TODAY_KEY);
+  if (alreadySeen) {
+    splashEl.classList.add('gone');
+    return;
+  }
+
+  // Mark as seen for today
+  localStorage.setItem(TODAY_KEY, '1');
+
+  // Clean up old keys (keep storage lean)
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('steward_splash_') && k !== TODAY_KEY)
+    .forEach(k => localStorage.removeItem(k));
+
+  // Show for 2.2s then fade out — feels deliberate, not loading-spinnerish
+  setTimeout(() => {
+    splashEl.classList.add('fade-out');
+    setTimeout(() => splashEl.classList.add('gone'), 950);
+  }, 2200);
+})();
+
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRQU7y4flPg9AmYc5FGPkWe91tkyl-i_MG9yqv8Af5NaEPED88Zf5itR3lP-e5pIs8RcKT-5-ebk1j9/pub?gid=849784355&single=true&output=csv";
 const API_URL  = "https://script.google.com/macros/s/AKfycbwuHmio9pDdSGRxgtZ86FaAoeNSQN3ZB3BET49i8RX7yGHx-DVeQe7Pe8spOe26pdc3/exec";
@@ -2278,6 +2499,20 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
   return wrap;
 }
 
+
+// ─── TASK ENTRY ANIMATION ─────────────────────────────────────────────────────
+function animateTasksIn() {
+  var rows = document.querySelectorAll('#task-list .task-row');
+  rows.forEach(function(row, i) {
+    row.classList.remove('animating');
+    row.style.animationDelay = '';
+    // Force reflow
+    void row.offsetWidth;
+    row.style.animationDelay = (i * 28) + 'ms';
+    row.classList.add('animating');
+  });
+}
+
 // ─── RENDER TODAY ─────────────────────────────────────────────────────────────
 // renderInPlace: updates check state visually without reordering tasks
 function renderInPlace() {
@@ -2321,6 +2556,20 @@ function renderInPlace() {
   });
 
   updateRightColumn(pct, doneCount, total, remaining, coreTasks, todayKey, bonusDone);
+}
+
+
+// ── TASK ENTRY ANIMATION ───────────────────────────────────────────────────
+function animateTaskList(listEl) {
+  const items = listEl.querySelectorAll('.task-wrap, .section-header');
+  items.forEach((el, i) => {
+    el.classList.remove('animate-in');
+    el.style.animationDelay = '';
+    // Force reflow so re-renders also animate
+    void el.offsetWidth;
+    el.style.animationDelay = (i * 38) + 'ms';
+    el.classList.add('animate-in');
+  });
 }
 
 function render() {
