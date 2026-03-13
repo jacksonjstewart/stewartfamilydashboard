@@ -1165,10 +1165,19 @@
     color: rgba(255,255,255,0.15); letter-spacing: 3px;
     margin-bottom: -2px; padding-left: 2px;
   }
+  #wr-wm-name-wrap {
+    display: flex; align-items: baseline; gap: 3px;
+  }
   #wr-wm-name {
     font-family: 'Cormorant Garamond', serif;
     font-size: 32px; font-weight: 300;
     color: rgba(255,255,255,0.12); letter-spacing: -1px; line-height: 1;
+  }
+  #wr-wm-copy {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px; font-weight: 300;
+    color: rgba(255,255,255,0.08);
+    margin-bottom: 3px;
   }
 
   /* Scrollable body */
@@ -1247,7 +1256,9 @@
   .wr-stat {
     background: #0f0f0f; border: 1px solid #181818;
     border-radius: 10px; padding: 12px 8px 10px;
-    text-align: center;
+    text-align: center; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    min-height: 72px;
   }
   .wr-stat-val {
     font-family: 'Cormorant Garamond', serif;
@@ -1353,7 +1364,7 @@
   #wr-line {
     font-family: 'Cormorant Garamond', serif;
     font-size: 15px; font-weight: 300; font-style: italic;
-    color: rgba(255,255,255,0.2); letter-spacing: 0.2px;
+    color: rgba(255,255,255,0.45); letter-spacing: 0.2px;
     line-height: 1.5; text-align: center;
     padding: 16px 0 20px;
     border-top: 1px solid #111;
@@ -1404,7 +1415,10 @@
     <!-- Wordmark -->
     <div id="wr-wordmark">
       <div id="wr-wm-the">the</div>
-      <div id="wr-wm-name">Stewarts</div>
+      <div id="wr-wm-name-wrap">
+        <div id="wr-wm-name">Stewarts</div>
+        <div id="wr-wm-copy">©</div>
+      </div>
     </div>
 
     <!-- Scrollable body -->
@@ -3176,19 +3190,24 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   nonProactive.forEach(e => { if (secCounts[e.section] !== undefined) secCounts[e.section]++; });
   const maxSecCount = Math.max(...Object.values(secCounts), 1);
 
-  // ── Observational line ────────────────────────────────────────────────────
-  const topSec    = SECTIONS.slice().sort((a,b) => secCounts[b.key]-secCounts[a.key])[0];
-  const uniqueDays = new Set(nonProactive.map(e => e.dateKey)).size;
+  // ── Observational line — analytical, not editorial ───────────────────────
+  const schedExcToday = (() => {
+    let n = 0;
+    for (let d = new Date(curMonDate); ; d.setDate(d.getDate()+1)) {
+      const dk = dateKey(d);
+      if (dk >= todayDk || dk > dateKey(endDate)) break;
+      n += allTasks.filter(t => t.type !== 'once' && isDueOn(t, d)).length;
+    }
+    return n;
+  })();
+  const adherePct = schedExcToday > 0 ? Math.round(totalDone / schedExcToday * 100) : null;
   let line = '';
-  if (totalDone === 0) {
-    line = 'No tasks recorded yet this window.';
-  } else if (missed === 0 && totalSched > 0) {
-    line = 'Nothing missed. Clean week.';
-  } else if (uniqueDays === 7) {
-    line = 'Tasks completed every day of the week.';
+  if (totalDone === 0 && schedExcToday === 0) {
+    line = 'No completed days to report yet.';
+  } else if (adherePct === null) {
+    line = totalDone + ' task' + (totalDone !== 1 ? 's' : '') + ' completed this window.';
   } else {
-    const pct = Math.round(secCounts[topSec.key] / totalDone * 100);
-    line = topSec.label + ' led the week' + (pct < 100 ? ' at ' + pct + '%.' : '.');
+    line = totalDone + ' / ' + schedExcToday + ' tasks completed as scheduled (' + adherePct + '%).';
   }
 
   // ── Populate DOM ──────────────────────────────────────────────────────────
@@ -3205,7 +3224,7 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   const missedItems = [];
   for (let d = new Date(curMonDate); ; d.setDate(d.getDate()+1)) {
     const dk = dateKey(d);
-    if (dk > todayDk) break;
+    if (dk >= todayDk) break;  // exclude today — day not yet finished
     if (dk > dateKey(endDate)) break;
     const dayDone = new Set(nonProactive.filter(e => e.dateKey === dk).map(e => e.taskId));
     allTasks.filter(t => t.type !== 'once' && isDueOn(t, d)).forEach(t => {
@@ -3250,7 +3269,7 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   const statDefs = [
     { val: totalDone,     lbl: 'COMPLETED',  cls: totalDone > 0   ? 'accent-green' : '', items: completedItems },
     { val: missedItems.length, lbl: 'MISSED', cls: missedItems.length > 0 ? 'accent-red' : '', items: missedItems },
-    { val: otoItems.length,    lbl: 'OTO EVENTS', cls: otoItems.length > 0 ? 'accent-gold' : '', items: otoItems },
+    { val: otoItems.length,    lbl: 'ONE TIME ONLY', cls: otoItems.length > 0 ? 'accent-gold' : '', items: otoItems },
     { val: aheadItems.length,  lbl: 'GET AHEAD',  cls: aheadItems.length > 0 ? 'accent-blue' : '', items: aheadItems },
   ];
 
@@ -3365,7 +3384,7 @@ function buildWeeklyReport() {
 
   const prevMon = new Date(now); prevMon.setDate(now.getDate()-7); prevMon.setHours(0,0,0,0);
   const prevSun = new Date(prevMon); prevSun.setDate(prevMon.getDate()+6); prevSun.setHours(23,59,59,999);
-  const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate();
+  const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
   const entries = rawHistory.filter(e => e.dateKey >= dateKey(prevMon) && e.dateKey <= dateKey(prevSun));
   _renderWeekReport(entries, fmt(prevMon) + ' — ' + fmt(prevSun), 1600, prevMon, prevSun);
 }
@@ -3376,7 +3395,7 @@ function showWeekReview() {
   const curMon = new Date(now);
   curMon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
   curMon.setHours(0,0,0,0);
-  const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate();
+  const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
   const label = fmt(curMon) + ' — ' + fmt(now) + ' · in progress';
   const entries = rawHistory.filter(e => e.dateKey >= dateKey(curMon) && e.dateKey <= dateKey(now));
   _renderWeekReport(entries, label, 0, curMon, now);
