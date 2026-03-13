@@ -3186,28 +3186,13 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   nonProactive.forEach(e => { if (secCounts[e.section] !== undefined) secCounts[e.section]++; });
   const maxSecCount = Math.max(...Object.values(secCounts), 1);
 
-  // ── Single source of truth: completed vs scheduled, past days only ────────
-  // "Past days" = days before today (today in progress, not counted either way)
-  let schedPast = 0;
-  let donePast  = 0;
+  // donePast = non-proactive completions on past days (excludes today)
+  // Used later once missedItems is built to form the tally line
+  let donePast = 0;
   for (let d = new Date(curMonDate); ; d.setDate(d.getDate()+1)) {
     const dk = dateKey(d);
     if (dk >= todayDk || dk > dateKey(endDate)) break;
-    const dayTasks = allTasks.filter(t => t.type !== 'once' && isDueOn(t, d));
-    schedPast += dayTasks.length;
-    donePast  += nonProactive.filter(e => e.dateKey === dk).length;
-  }
-  // Cap donePast at schedPast — can't complete more than scheduled for the fraction
-  const donePastCapped = Math.min(donePast, schedPast);
-  const adherePct = schedPast > 0 ? Math.round(donePastCapped / schedPast * 100) : null;
-  const bright = n => `<span class="wr-line-num">${n}</span>`;
-  let line = '';
-  if (schedPast === 0) {
-    line = totalDone > 0
-      ? bright(totalDone) + ' task' + (totalDone !== 1 ? 's' : '') + ' completed today.'
-      : 'No completed days to report yet.';
-  } else {
-    line = bright(donePastCapped) + ' / ' + bright(schedPast) + ' tasks completed as scheduled (' + bright((adherePct ?? 0) + '%') + ').';
+    donePast += nonProactive.filter(e => e.dateKey === dk).length;
   }
 
   // ── Populate DOM ──────────────────────────────────────────────────────────
@@ -3234,21 +3219,56 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
     });
   }
 
-  // OTO detail items
-  const otoItems = rawOTOEvents.filter(e =>
+  // ── OTO task IDs — identify once-tasks in history ────────────────────────
+  // OTO entries land in rawHistory. Detect them by matching against sheet task type.
+  const onceTaskIds = new Set(allTasks.filter(t => t.type === 'once').map(t => t.id));
+  // Also catch any taskId that appears in rawOTOEvents
+  rawOTOEvents.forEach(e => { if (e.id) onceTaskIds.add(e.id); });
+
+  // Re-separate: OTO completions from rawHistory (within window)
+  const historyOTOs    = nonProactive.filter(e => onceTaskIds.has(e.taskId));
+  const historyRecurr  = nonProactive.filter(e => !onceTaskIds.has(e.taskId));
+
+  // COMPLETED stat = all non-proactive (recurring + OTO)
+  const completedItems = nonProactive.map(e => ({
+    name: e.name, emoji: e.emoji || '', day: e.dateKey
+  }));
+
+  // ONE TIME ONLY = OTO completions from rawHistory (reliable) + rawOTOEvents (backup)
+  // Deduplicate by taskId+day
+  const otoSeen = new Set();
+  const otoItems = [];
+  historyOTOs.forEach(e => {
+    const key = (e.taskId || e.name) + '_' + e.dateKey;
+    if (!otoSeen.has(key)) { otoSeen.add(key); otoItems.push({ name: e.name, emoji: e.emoji || '', day: e.dateKey }); }
+  });
+  rawOTOEvents.filter(e =>
     e.status === 'completed' && e.completedAt &&
     e.completedAt.slice(0,10) >= wMon && e.completedAt.slice(0,10) <= wEnd
-  ).map(e => ({ name: e.name, emoji: e.emoji || '', day: e.dateKey || e.completedAt.slice(0,10) }));
+  ).forEach(e => {
+    const key = (e.id || e.name) + '_' + (e.dateKey || e.completedAt.slice(0,10));
+    if (!otoSeen.has(key)) { otoSeen.add(key); otoItems.push({ name: e.name, emoji: e.emoji || '', day: e.dateKey || e.completedAt.slice(0,10) }); }
+  });
 
   // GET AHEAD detail items
   const aheadItems = proactive.map(e => ({
     name: e.name, emoji: e.emoji || '', day: e.dateKey
   }));
 
-  // COMPLETED detail items
-  const completedItems = nonProactive.map(e => ({
-    name: e.name, emoji: e.emoji || '', day: e.dateKey
-  }));
+  // ── Tally line — self-consistent: done + missed = total scheduled past days ─
+  // Use missedItems (already computed, excludes today) as the missed count
+  // donePast already computed from same day range
+  const totalScheduledPast = donePast + missedItems.length;
+  const pct = totalScheduledPast > 0 ? Math.round(donePast / totalScheduledPast * 100) : null;
+  const bright = n => `<span class="wr-line-num">${n}</span>`;
+  let line = '';
+  if (totalScheduledPast === 0) {
+    line = totalDone > 0
+      ? bright(totalDone) + ' task' + (totalDone !== 1 ? 's' : '') + ' completed today.'
+      : 'No completed days to report yet.';
+  } else {
+    line = bright(donePast) + ' / ' + bright(totalScheduledPast) + ' tasks completed as scheduled (' + bright((pct ?? 0) + '%') + ').';
+  }
 
   const dayLabel = dk => {
     const d = new Date(dk + 'T00:00:00');
@@ -3267,13 +3287,13 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   };
 
   const statDefs = [
-    { val: totalDone,     lbl: 'COMPLETED',  cls: totalDone > 0   ? 'accent-green' : '', items: completedItems },
-    { val: missedItems.length, lbl: 'MISSED', cls: missedItems.length > 0 ? 'accent-red' : '', items: missedItems },
-    { val: otoItems.length,    lbl: 'ONE TIME ONLY', cls: otoItems.length > 0 ? 'accent-gold' : '', items: otoItems },
-    { val: aheadItems.length,  lbl: 'GET AHEAD',  cls: aheadItems.length > 0 ? 'accent-blue' : '', items: aheadItems },
+    { val: totalDone,          lbl: 'COMPLETED',     cls: totalDone > 0          ? 'accent-green' : '', items: completedItems },
+    { val: missedItems.length, lbl: 'MISSED',         cls: missedItems.length > 0 ? 'accent-red'   : '', items: missedItems },
+    { val: otoItems.length,    lbl: 'ONE TIME ONLY',  cls: otoItems.length > 0    ? 'accent-gold'  : '', items: otoItems },
+    { val: aheadItems.length,  lbl: 'GET AHEAD',      cls: aheadItems.length > 0  ? 'accent-blue'  : '', items: aheadItems },
   ];
 
-  // Render 4 stat boxes
+  // Render 4 stat boxes — always same structure so height is uniform
   const boxEls = [];
   statDefs.forEach((s, i) => {
     const box = document.createElement('div');
@@ -3281,7 +3301,7 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
     box.dataset.idx = i;
     box.innerHTML = `<div class="wr-stat-val ${s.cls}">${s.val}</div>
       <div class="wr-stat-lbl">${s.lbl}</div>
-      ${s.items.length > 0 ? '<div class="wr-stat-caret">▾</div>' : ''}`;
+      <div class="wr-stat-caret" style="${s.items.length > 0 ? '' : 'visibility:hidden'}">▾</div>`;
     statsEl.appendChild(box);
     boxEls.push(box);
   });
@@ -3298,19 +3318,15 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
     if (!statDefs[i].items.length) return;
     box.addEventListener('click', () => {
       if (openIdx === i) {
-        // Close
         drawer.classList.remove('open');
         box.classList.remove('open');
         openIdx = -1;
       } else {
-        // Close previous
         if (openIdx >= 0) { boxEls[openIdx].classList.remove('open'); }
-        // Open new
         drawer.innerHTML = makeDetailHTML(statDefs[i].items);
         drawer.classList.add('open');
         box.classList.add('open');
         openIdx = i;
-        // Scroll drawer into view
         setTimeout(() => drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
       }
     });
