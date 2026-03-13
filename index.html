@@ -1122,7 +1122,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.9 · pre-release</div>
+    <div id="version-tag">v0.11.10 · pre-release</div>
   </div>
   </div>
 
@@ -1715,7 +1715,7 @@ async function syncTodayState() {
     // ADD: entries in sheet but not in local doneLog
     // Guard: skip if taskId has a pending write OR within quiet window (user may have just unchecked)
     const sinceLastToggleAdd = Date.now() - (_lastToggleTime || 0);
-    if (sinceLastToggleAdd > 5000) {
+    if (sinceLastToggleAdd > 12000) {
       data.entries.forEach(entry => {
         const taskId      = String(entry.taskId  || '').trim();
         const dkStr       = String(entry.dateKey || '').trim();
@@ -1732,7 +1732,7 @@ async function syncTodayState() {
     // Guard 1: skip taskIds currently being written (in-flight protection)
     // Guard 2: skip all removals within 5s of any local toggle (rapid-click protection)
     const sinceLastToggle = Date.now() - (_lastToggleTime || 0);
-    if (sinceLastToggle > 5000) {
+    if (sinceLastToggle > 12000) {
       Object.keys(doneLog).forEach(key => {
         if (!key.endsWith("_" + todayKey)) return;
         const taskId = key.replace("_" + todayKey, "");
@@ -2313,7 +2313,6 @@ function render() {
   }
   }
 }
-  updateRightColumn(pct, doneCount, total, remaining, todayTasks, todayKey);
 }
 
 // ─── RENDER WEEK ──────────────────────────────────────────────────────────────
@@ -2442,7 +2441,8 @@ function renderWeek() {
 }
 
 // ─── RIGHT COLUMN: TODAY ─────────────────────────────────────────────────────
-function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key, bonusDone) {
+function updateRightColumn(pct, doneCount, total, remaining, coreTasks, key, bonusDone) {
+  // coreTasks = OTO + recurring due today ONLY. Get-ahead bonus tasks excluded.
   bonusDone = bonusDone || 0;
   const rc = pct === 100 ? "#4ade80" : pct >= 60 ? "#a3e635" : pct >= 30 ? "#facc15" : "#f87171";
   const ringFill = document.getElementById("ring-fill");
@@ -2495,7 +2495,7 @@ function updateRightColumn(pct, doneCount, total, remaining, todayTasks, key, bo
   const barsEl = document.getElementById("sec-bars");
   barsEl.innerHTML = "";
   SECTIONS.forEach(sec => {
-    const tasks = todayTasks.filter(t => t.section === sec.key);
+    const tasks = coreTasks.filter(t => t.section === sec.key);
     if (!tasks.length) return;
     const sd = tasks.filter(t => doneLog[t.id + "_" + key]).length;
     const sp = Math.round((sd / tasks.length) * 100);
