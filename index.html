@@ -59,22 +59,27 @@
   }
 
   #right {
-    padding: 48px 28px;
+    padding: 32px 24px 28px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     background: var(--bg-right, #0d0d0d);
     position: sticky;
     top: 0;
     height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
     transition: background 8s ease;
+    scrollbar-width: none; /* Firefox — hide scrollbar but keep scrollable */
   }
+  #right::-webkit-scrollbar { display: none; } /* Chrome/Safari */
   /* Group everything below the brand together so space-between puts brand at top-third */
   #right-main {
     display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    flex: 1; gap: 0; width: 100%;
+    align-items: center; justify-content: flex-start;
+    width: 100%; gap: 0;
+    padding-top: 12px;
   }
 
   /* ── FAMILY BRAND ── */
@@ -131,7 +136,7 @@
 
   /* ── GREETING ── */
   #greeting-wrap {
-    text-align: center; margin-bottom: 16px; min-height: 18px;
+    text-align: center; margin-bottom: 8px; min-height: 16px;
   }
   #greeting-text {
     font-size: 10px; color: #333; letter-spacing: 2px;
@@ -778,9 +783,10 @@
   /* ── RIGHT COLUMN ── */
   #ring-wrap {
     position: relative;
-    width: min(200px, 80%);
+    width: min(180px, 75%);
     aspect-ratio: 1;
     flex-shrink: 0;
+    margin-top: 8px;
   }
   #ring-wrap svg {
     position: absolute; inset: 0;
@@ -800,16 +806,16 @@
   #ring-pct span { font-size: clamp(14px, 1.6vw, 22px); color: #555; letter-spacing: 0; }
   #ring-label { font-size: 10px; color: #555; letter-spacing: 2px; margin-top: 3px; }
 
-  #motivate-wrap { text-align: center; margin-top: 28px; margin-bottom: 32px; }
-  #motivate-msg { font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 300; line-height: 1.1; margin-bottom: 8px; transition: color 0.5s; }
-  #motivate-sub { font-size: 13px; color: #555; }
+  #motivate-wrap { text-align: center; margin-top: 20px; margin-bottom: 20px; }
+  #motivate-msg { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; line-height: 1.1; margin-bottom: 6px; transition: color 0.5s; }
+  #motivate-sub { font-size: 12px; color: #555; }
 
-  #stats { display: flex; gap: 10px; width: 100%; margin-bottom: 28px; }
+  #stats { display: flex; gap: 10px; width: 100%; margin-bottom: 20px; }
   .stat-box { flex: 1; background: #111; border: 1px solid #1e1e1e; border-radius: 12px; padding: 14px 0; text-align: center; }
   .stat-val { font-family: 'Cormorant Garamond', serif; font-size: 38px; font-weight: 300; line-height: 1; }
   .stat-lbl { font-size: 9px; color: #444; letter-spacing: 2px; margin-top: 5px; }
 
-  #sec-bars { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+  #sec-bars { width: 100%; display: flex; flex-direction: column; gap: 12px; padding-bottom: 20px; }
   .bar-row { width: 100%; }
   .bar-meta { display: flex; justify-content: space-between; margin-bottom: 5px; }
   .bar-name { font-size: 10px; color: #555; letter-spacing: 1.5px; }
@@ -1094,7 +1100,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.7 · pre-release</div>
+    <div id="version-tag">v0.11.8 · pre-release</div>
   </div>
   </div>
 
