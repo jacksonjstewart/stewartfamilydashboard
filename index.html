@@ -1369,6 +1369,10 @@
     padding: 16px 0 20px;
     border-top: 1px solid #111;
   }
+  .wr-line-num {
+    font-style: normal; font-weight: 400;
+    color: rgba(255,255,255,0.88); letter-spacing: -0.3px;
+  }
 
   /* Footer */
   #wr-footer {
@@ -3172,14 +3176,6 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   const totalDone     = nonProactive.length;
   const totalAhead    = proactive.length;
 
-  // Scheduled across the window (non-future days)
-  let totalSched = 0;
-  for (let d = new Date(curMonDate); d <= endDate; d.setDate(d.getDate()+1)) {
-    if (dateKey(d) > todayDk) continue;
-    totalSched += allTasks.filter(t => t.type !== 'once' && isDueOn(t, d)).length;
-  }
-  const missed = Math.max(0, totalSched - totalDone);
-
   // OTO window bounds (used by drawer detail builder)
   const wMon = dateKey(curMonDate);
   const wEnd = dateKey(endDate) <= todayDk ? dateKey(endDate) : todayDk;
@@ -3190,24 +3186,28 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   nonProactive.forEach(e => { if (secCounts[e.section] !== undefined) secCounts[e.section]++; });
   const maxSecCount = Math.max(...Object.values(secCounts), 1);
 
-  // ── Observational line — analytical, not editorial ───────────────────────
-  const schedExcToday = (() => {
-    let n = 0;
-    for (let d = new Date(curMonDate); ; d.setDate(d.getDate()+1)) {
-      const dk = dateKey(d);
-      if (dk >= todayDk || dk > dateKey(endDate)) break;
-      n += allTasks.filter(t => t.type !== 'once' && isDueOn(t, d)).length;
-    }
-    return n;
-  })();
-  const adherePct = schedExcToday > 0 ? Math.round(totalDone / schedExcToday * 100) : null;
+  // ── Single source of truth: completed vs scheduled, past days only ────────
+  // "Past days" = days before today (today in progress, not counted either way)
+  let schedPast = 0;
+  let donePast  = 0;
+  for (let d = new Date(curMonDate); ; d.setDate(d.getDate()+1)) {
+    const dk = dateKey(d);
+    if (dk >= todayDk || dk > dateKey(endDate)) break;
+    const dayTasks = allTasks.filter(t => t.type !== 'once' && isDueOn(t, d));
+    schedPast += dayTasks.length;
+    donePast  += nonProactive.filter(e => e.dateKey === dk).length;
+  }
+  // Cap donePast at schedPast — can't complete more than scheduled for the fraction
+  const donePastCapped = Math.min(donePast, schedPast);
+  const adherePct = schedPast > 0 ? Math.round(donePastCapped / schedPast * 100) : null;
+  const bright = n => `<span class="wr-line-num">${n}</span>`;
   let line = '';
-  if (totalDone === 0 && schedExcToday === 0) {
-    line = 'No completed days to report yet.';
-  } else if (adherePct === null) {
-    line = totalDone + ' task' + (totalDone !== 1 ? 's' : '') + ' completed this window.';
+  if (schedPast === 0) {
+    line = totalDone > 0
+      ? bright(totalDone) + ' task' + (totalDone !== 1 ? 's' : '') + ' completed today.'
+      : 'No completed days to report yet.';
   } else {
-    line = totalDone + ' / ' + schedExcToday + ' tasks completed as scheduled (' + adherePct + '%).';
+    line = bright(donePastCapped) + ' / ' + bright(schedPast) + ' tasks completed as scheduled (' + bright((adherePct ?? 0) + '%') + ').';
   }
 
   // ── Populate DOM ──────────────────────────────────────────────────────────
@@ -3334,7 +3334,7 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
     secEl.appendChild(row);
   });
 
-  document.getElementById('wr-line').textContent = line;
+  document.getElementById('wr-line').innerHTML = line;
 
   // ── Show overlay ──────────────────────────────────────────────────────────
   const el = document.getElementById('weekly-report');
