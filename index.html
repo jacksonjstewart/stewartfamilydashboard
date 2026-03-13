@@ -449,6 +449,14 @@
     font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
     letter-spacing: 1.5px; transition: all 0.2s; white-space: nowrap;
   }
+  #wr-peek-btn {
+    background: transparent; border: none; color: #2a2a2a;
+    cursor: pointer; padding: 0;
+    font-family: 'Outfit', sans-serif; font-size: 8px; font-weight: 600;
+    letter-spacing: 2px; transition: color 0.2s; white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #wr-peek-btn:hover { color: #555; }
   #edit-btn:hover { border-color: #333; color: #888; }
 
   /* ── IDENTITY PICKER ── */
@@ -1105,90 +1113,217 @@
   /* ── WEEKLY REPORT ──────────────────────────────────────────────────────── */
   #weekly-report {
     position: fixed; inset: 0; z-index: 9998;
-    background: #060606;
     display: flex; align-items: center; justify-content: center;
-    opacity: 0;
-    transition: opacity 0.7s cubic-bezier(0.4,0,0.2,1);
-    pointer-events: none;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.65s cubic-bezier(0.4,0,0.2,1);
+    padding: 0;
   }
-  #weekly-report.visible {
-    opacity: 1; pointer-events: all;
+  #weekly-report.visible { opacity: 1; pointer-events: all; }
+
+  /* Semi-transparent backdrop — app bleeds through subtly */
+  #wr-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(6,6,6,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
-  #wr-inner {
-    display: inline-flex; flex-direction: column;
+
+  /* The card */
+  #wr-card {
+    position: relative; z-index: 1;
+    width: min(520px, 100vw);
+    max-height: 100dvh;
+    display: flex; flex-direction: column;
+    background: #0c0c0c;
+    border: 1px solid #1e1e1e;
+    border-radius: 20px;
+    overflow: hidden;
+    transform: translateY(16px);
+    transition: transform 1.0s cubic-bezier(0.16,1,0.3,1) 0.15s;
+  }
+  #weekly-report.visible #wr-card { transform: translateY(0); }
+
+  /* Mobile: full screen card */
+  @media (max-width: 600px) {
+    #wr-card {
+      width: 100vw; max-height: 100dvh;
+      border-radius: 0; border-left: none; border-right: none;
+      border-top: 1px solid #1e1e1e; border-bottom: none;
+    }
+  }
+
+  /* Wordmark — top of card, left-aligned, subtle */
+  #wr-wordmark {
+    display: flex; flex-direction: column;
     align-items: flex-start;
-    opacity: 0; transform: translateY(14px);
-    transition: opacity 1.0s ease 0.2s, transform 1.0s cubic-bezier(0.16,1,0.3,1) 0.2s;
+    padding: 22px 28px 0;
+    flex-shrink: 0;
   }
-  #weekly-report.visible #wr-inner {
-    opacity: 1; transform: translateY(0);
+  #wr-wm-the {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.15); letter-spacing: 3px;
+    margin-bottom: -2px; padding-left: 2px;
   }
+  #wr-wm-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px; font-weight: 300;
+    color: rgba(255,255,255,0.12); letter-spacing: -1px; line-height: 1;
+  }
+
+  /* Scrollable body */
+  #wr-body {
+    flex: 1; overflow-y: auto; padding: 20px 28px 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Header */
+  #wr-header { margin-bottom: 16px; text-align: center; }
   #wr-eyebrow {
     font-family: 'Outfit', sans-serif;
-    font-size: 9px; font-weight: 600; letter-spacing: 5px;
-    color: rgba(255,255,255,0.2);
-    margin-bottom: 14px;
+    font-size: 8px; font-weight: 700; letter-spacing: 5px;
+    color: rgba(255,255,255,0.18); margin-bottom: 6px;
   }
   #wr-dates {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 15px; font-weight: 300; font-style: italic;
-    color: rgba(255,255,255,0.35); letter-spacing: 0.5px;
-    margin-bottom: 18px;
+    font-size: 18px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.45); letter-spacing: 0.3px;
   }
-  #wr-rule {
-    width: 100%; height: 1px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.12), transparent);
-    margin-bottom: 32px;
+
+  #wr-divider, #wr-divider2 {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #1e1e1e 30%, #1e1e1e 70%, transparent);
+    margin: 0 -4px 20px;
   }
-  #wr-number {
+
+  /* Bar chart */
+  #wr-chart {
+    display: flex; align-items: flex-end; justify-content: center;
+    gap: 8px; height: 80px; margin-bottom: 8px;
+  }
+  .wr-day-col {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 4px; flex: 1;
+  }
+  .wr-bar-wrap {
+    width: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-end;
+    height: 56px; gap: 2px;
+  }
+  .wr-bar-sched {
+    width: 100%; border-radius: 3px 3px 0 0;
+    background: #1c1c1c; position: relative;
+    min-height: 3px;
+  }
+  .wr-bar-done {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    border-radius: 3px 3px 0 0;
+    background: #4ade80; opacity: 0.75;
+    transition: height 0.8s cubic-bezier(0.16,1,0.3,1);
+    min-height: 0;
+  }
+  .wr-bar-done.full { opacity: 0.9; }
+  .wr-day-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 8px; font-weight: 600; letter-spacing: 1px;
+    color: #333; margin-top: 2px;
+  }
+  .wr-day-label.today { color: #555; }
+  .wr-day-num {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 86px; font-weight: 300;
-    color: #ffffff; letter-spacing: -3px; line-height: 0.9;
-    margin-bottom: 6px;
+    font-size: 14px; font-weight: 300; color: #2a2a2a; line-height: 1;
   }
-  #wr-number span {
-    font-size: 22px; letter-spacing: 0; color: rgba(255,255,255,0.3);
-    font-weight: 300; margin-left: 4px;
+  .wr-day-num.today { color: rgba(255,255,255,0.45); }
+  .wr-day-col.perfect .wr-bar-done { background: #4ade80; }
+  .wr-day-col.missed  .wr-bar-done { background: #f87171; opacity: 0.6; }
+  .wr-day-col.future  .wr-bar-wrap { opacity: 0.2; }
+
+  /* Stats row */
+  #wr-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-bottom: 20px;
   }
+  .wr-stat {
+    background: #0f0f0f; border: 1px solid #181818;
+    border-radius: 10px; padding: 12px 8px 10px;
+    text-align: center;
+  }
+  .wr-stat-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px; font-weight: 300; line-height: 1;
+    color: #e8e8e8; letter-spacing: -1px;
+  }
+  .wr-stat-lbl {
+    font-family: 'Outfit', sans-serif;
+    font-size: 7px; font-weight: 600; letter-spacing: 1.5px;
+    color: #333; margin-top: 5px; line-height: 1.2;
+  }
+  .wr-stat-val.accent-green { color: #4ade80; }
+  .wr-stat-val.accent-red   { color: #f87171; }
+  .wr-stat-val.accent-blue  { color: #7dd3fc; }
+  .wr-stat-val.accent-gold  { color: #facc15; }
+
+  /* Section breakdown */
   #wr-sections {
-    display: flex; flex-direction: column; gap: 10px;
-    width: 100%; margin-top: 24px; margin-bottom: 32px;
+    display: flex; flex-direction: column;
+    gap: 9px; margin-bottom: 20px;
   }
   .wr-sec-row {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; gap: 10px;
   }
   .wr-sec-pip {
-    width: 2px; height: 12px; border-radius: 99px; flex-shrink: 0; opacity: 0.7;
+    width: 2px; height: 11px; border-radius: 99px;
+    flex-shrink: 0; opacity: 0.7;
   }
   .wr-sec-label {
     font-family: 'Outfit', sans-serif;
-    font-size: 9px; font-weight: 600; letter-spacing: 2.5px;
-    color: #444; flex: 1;
+    font-size: 8.5px; font-weight: 600; letter-spacing: 2px;
+    color: #3a3a3a; flex: 1;
+  }
+  .wr-sec-bar-track {
+    width: 80px; height: 2px;
+    background: #181818; border-radius: 99px; overflow: hidden;
+  }
+  .wr-sec-bar-fill {
+    height: 100%; border-radius: 99px; opacity: 0.7;
+    transition: width 0.9s cubic-bezier(0.16,1,0.3,1) 0.3s;
   }
   .wr-sec-count {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 22px; font-weight: 300; color: rgba(255,255,255,0.5);
-    letter-spacing: -0.5px; line-height: 1;
+    font-size: 18px; font-weight: 300;
+    color: rgba(255,255,255,0.4); letter-spacing: -0.5px;
+    min-width: 24px; text-align: right;
   }
+
+  /* Observational line */
   #wr-line {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 16px; font-weight: 300; font-style: italic;
-    color: rgba(255,255,255,0.25); letter-spacing: 0.2px;
-    line-height: 1.4; margin-bottom: 40px;
-    border-top: 1px solid #111; padding-top: 20px;
-    width: 100%;
+    font-size: 15px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.2); letter-spacing: 0.2px;
+    line-height: 1.5; text-align: center;
+    padding: 16px 0 20px;
+    border-top: 1px solid #111;
+  }
+
+  /* Footer */
+  #wr-footer {
+    flex-shrink: 0;
+    display: flex; justify-content: center;
+    padding: 16px 28px 24px;
+    border-top: 1px solid #111;
+    background: #0c0c0c;
   }
   #wr-noted {
-    align-self: flex-end;
-    background: none; border: 1px solid #222; border-radius: 4px;
-    color: rgba(255,255,255,0.3); cursor: pointer;
+    background: none; border: 1px solid #252525;
+    border-radius: 6px; cursor: pointer;
     font-family: 'Outfit', sans-serif;
-    font-size: 9px; font-weight: 600; letter-spacing: 4px;
-    padding: 10px 20px;
+    font-size: 9px; font-weight: 700; letter-spacing: 5px;
+    color: rgba(255,255,255,0.25);
+    padding: 11px 36px;
     transition: border-color 0.2s, color 0.2s;
     -webkit-tap-highlight-color: transparent;
   }
-  #wr-noted:hover { border-color: #444; color: rgba(255,255,255,0.6); }
+  #wr-noted:hover  { border-color: #3a3a3a; color: rgba(255,255,255,0.5); }
   #wr-noted:active { transform: scale(0.97); }
 
 </style>
@@ -1209,14 +1344,47 @@
 
 <!-- ── WEEKLY REPORT ──────────────────────────────────────────────────────── -->
 <div id="weekly-report" style="display:none;">
-  <div id="wr-inner">
-    <div id="wr-eyebrow">WEEK IN REVIEW</div>
-    <div id="wr-dates"></div>
-    <div id="wr-rule"></div>
-    <div id="wr-number"></div>
-    <div id="wr-sections"></div>
-    <div id="wr-line"></div>
-    <button id="wr-noted">NOTED</button>
+  <div id="wr-backdrop"></div>
+  <div id="wr-card">
+
+    <!-- Wordmark -->
+    <div id="wr-wordmark">
+      <div id="wr-wm-the">the</div>
+      <div id="wr-wm-name">Stewart</div>
+    </div>
+
+    <!-- Scrollable body -->
+    <div id="wr-body">
+
+      <!-- Header -->
+      <div id="wr-header">
+        <div id="wr-eyebrow">WEEK IN REVIEW</div>
+        <div id="wr-dates"></div>
+      </div>
+
+      <div id="wr-divider"></div>
+
+      <!-- Bar chart: scheduled vs completed per day -->
+      <div id="wr-chart"></div>
+
+      <div id="wr-divider2"></div>
+
+      <!-- Stats row -->
+      <div id="wr-stats"></div>
+
+      <!-- Section breakdown -->
+      <div id="wr-sections"></div>
+
+      <!-- Observational line -->
+      <div id="wr-line"></div>
+
+    </div>
+
+    <!-- Noted -->
+    <div id="wr-footer">
+      <button id="wr-noted">NOTED</button>
+    </div>
+
   </div>
 </div>
 
@@ -1246,8 +1414,11 @@
         </div>
         <div id="sync-status">LOADING…</div>
       </div>
-      <!-- Top right: add task button -->
-      <button id="edit-btn" onclick="openTaskModal()">ADD TASK</button>
+      <!-- Top right: add task + week review -->
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <button id="edit-btn" onclick="openTaskModal()">ADD TASK</button>
+        <button id="wr-peek-btn" onclick="showWeekReview()">THIS WEEK</button>
+      </div>
     </div>
 
     <!-- Nav -->
@@ -2870,96 +3041,213 @@ function renderWeek() {
 
 
 // ─── WEEKLY REPORT ────────────────────────────────────────────────────────────
-function buildWeeklyReport() {
-  // Only on Mondays — first open this week
-  const now  = new Date();
-  const dow  = now.getDay(); // 0=Sun, 1=Mon
-  if (dow !== 1) return;   // Monday only
 
-  // Key: steward_wr_YYYY-WNN  (ISO week)
-  const jan4     = new Date(now.getFullYear(), 0, 4);
-  const weekNum  = Math.ceil(((now - jan4) / 864e5 + jan4.getDay() + 1) / 7);
-  const WR_KEY   = 'steward_wr_' + now.getFullYear() + '-W' + String(weekNum).padStart(2,'0');
-  if (localStorage.getItem(WR_KEY)) return; // already seen this week
-  localStorage.setItem(WR_KEY, '1');
+// Build the bar chart — scheduled vs completed per day of the window
+function _buildWRChart(curMonDate, endDate, weekEntries) {
+  const chartEl = document.getElementById('wr-chart');
+  chartEl.innerHTML = '';
+  const todayDk = dateKey(new Date());
 
-  // Previous Mon→Sun (the completed week)
-  const prevMon = new Date(now); prevMon.setDate(now.getDate() - 7);
-  prevMon.setHours(0,0,0,0);
-  const prevSun = new Date(prevMon); prevSun.setDate(prevMon.getDate() + 6);
-  prevSun.setHours(23,59,59,999);
-
-  const prevMonKey = dateKey(prevMon);
-  const prevSunKey = dateKey(prevSun);
-
-  // Filter rawHistory to that week
-  const weekEntries = rawHistory.filter(e =>
-    e.dateKey >= prevMonKey && e.dateKey <= prevSunKey
-  );
-
-  const total = weekEntries.length;
-
-  // Section counts
-  const secCounts = {};
-  SECTIONS.forEach(s => { secCounts[s.key] = 0; });
-  weekEntries.forEach(e => { if (secCounts[e.section] !== undefined) secCounts[e.section]++; });
-
-  // One-line observation — purely factual, derived from data
-  const topSec  = SECTIONS.slice().sort((a,b) => secCounts[b.key] - secCounts[a.key])[0];
-  const allZero = SECTIONS.every(s => secCounts[s.key] === 0);
-  let line = '';
-  if (total === 0) {
-    line = 'No tasks recorded for the week.';
-  } else {
-    const uniqueDays = new Set(weekEntries.map(e => e.dateKey)).size;
-    if (uniqueDays === 7) {
-      line = 'Tasks completed every day of the week.';
-    } else if (secCounts[topSec.key] > 0 && secCounts[topSec.key] === total) {
-      line = topSec.label + ' was the only active section.';
-    } else if (secCounts[topSec.key] > 0) {
-      const pct = Math.round(secCounts[topSec.key] / total * 100);
-      line = topSec.label + ' led the week at ' + pct + '%.';
-    } else {
-      line = uniqueDays + ' of 7 days had recorded tasks.';
-    }
+  // Walk each day in range (Mon → endDate, max 7)
+  const days = [];
+  for (let d = new Date(curMonDate); d <= endDate && days.length < 7; d.setDate(d.getDate()+1)) {
+    days.push(new Date(d));
   }
 
-  // Date label: "Mon Mar 10 — Sun Mar 16"
-  const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate();
-  const dateLabel = fmt(prevMon) + ' — ' + fmt(prevSun);
+  // Max scheduled across all days — for bar scaling
+  const allTasks = [...sheetTasks, ...customTasks];
+  const counts = days.map(d => {
+    const dk    = dateKey(d);
+    const sched = allTasks.filter(t => t.type !== 'once' && isDueOn(t, d)).length;
+    const done  = weekEntries.filter(e => e.dateKey === dk && !e.isProactive).length;
+    const isFuture = dk > todayDk;
+    return { d, dk, sched, done, isFuture };
+  });
+  const maxSched = Math.max(...counts.map(c => c.sched), 1);
 
-  // Populate DOM
-  document.getElementById('wr-dates').textContent  = dateLabel;
-  document.getElementById('wr-number').innerHTML   =
-    total + '<span>task' + (total !== 1 ? 's' : '') + '</span>';
-  document.getElementById('wr-line').textContent   = line;
+  counts.forEach(({ d, dk, sched, done, isFuture }) => {
+    const col  = document.createElement('div');
+    col.className = 'wr-day-col' +
+      (isFuture ? ' future' : done >= sched && sched > 0 ? ' perfect' : done < sched && !isFuture ? ' missed' : '');
 
+    const schedH = Math.max(4, Math.round((sched / maxSched) * 52));
+    const doneH  = isFuture ? 0 : Math.round((Math.min(done, sched) / maxSched) * 52);
+    const isToday = dk === todayDk;
+
+    col.innerHTML = `
+      <div class="wr-bar-wrap">
+        <div class="wr-bar-sched" style="height:${schedH}px">
+          <div class="wr-bar-done${done>=sched&&sched>0?' full':''}" style="height:0" data-h="${doneH}px"></div>
+        </div>
+      </div>
+      <div class="wr-day-label${isToday?' today':''}">${['M','T','W','T','F','S','S'][d.getDay()===0?6:d.getDay()-1]}</div>
+      <div class="wr-day-num${isToday?' today':''}">${d.getDate()}</div>`;
+
+    chartEl.appendChild(col);
+  });
+
+  // Animate bars in after a frame
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    chartEl.querySelectorAll('.wr-bar-done').forEach((bar, i) => {
+      setTimeout(() => { bar.style.height = bar.dataset.h; }, i * 60);
+    });
+  }));
+}
+
+function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
+  const todayDk   = dateKey(new Date());
+  const allTasks  = [...sheetTasks, ...customTasks];
+
+  // ── Core metrics ───────────────────────────────────────────────────────────
+  const nonProactive  = entries.filter(e => !e.isProactive);
+  const proactive     = entries.filter(e => e.isProactive);
+  const totalDone     = nonProactive.length;
+  const totalAhead    = proactive.length;
+
+  // Scheduled across the window (non-future days)
+  let totalSched = 0;
+  for (let d = new Date(curMonDate); d <= endDate; d.setDate(d.getDate()+1)) {
+    if (dateKey(d) > todayDk) continue;
+    totalSched += allTasks.filter(t => t.type !== 'once' && isDueOn(t, d)).length;
+  }
+  const missed = Math.max(0, totalSched - totalDone);
+
+  // OTO events completed this window
+  const wMon = dateKey(curMonDate);
+  const wEnd = dateKey(endDate) <= todayDk ? dateKey(endDate) : todayDk;
+  const otoThisWeek = rawOTOEvents.filter(e =>
+    e.status === 'completed' && e.completedAt &&
+    e.completedAt.slice(0,10) >= wMon && e.completedAt.slice(0,10) <= wEnd
+  ).length;
+
+  // Section counts (non-proactive only)
+  const secCounts = {};
+  SECTIONS.forEach(s => { secCounts[s.key] = 0; });
+  nonProactive.forEach(e => { if (secCounts[e.section] !== undefined) secCounts[e.section]++; });
+  const maxSecCount = Math.max(...Object.values(secCounts), 1);
+
+  // ── Observational line ────────────────────────────────────────────────────
+  const topSec    = SECTIONS.slice().sort((a,b) => secCounts[b.key]-secCounts[a.key])[0];
+  const uniqueDays = new Set(nonProactive.map(e => e.dateKey)).size;
+  let line = '';
+  if (totalDone === 0) {
+    line = 'No tasks recorded yet this window.';
+  } else if (missed === 0 && totalSched > 0) {
+    line = 'Nothing missed. Clean week.';
+  } else if (uniqueDays === 7) {
+    line = 'Tasks completed every day of the week.';
+  } else {
+    const pct = Math.round(secCounts[topSec.key] / totalDone * 100);
+    line = topSec.label + ' led the week' + (pct < 100 ? ' at ' + pct + '%.' : '.');
+  }
+
+  // ── Populate DOM ──────────────────────────────────────────────────────────
+  document.getElementById('wr-dates').textContent = dateLabel;
+
+  // Chart
+  _buildWRChart(curMonDate, endDate, entries);
+
+  // Stats grid
+  const statsEl = document.getElementById('wr-stats');
+  statsEl.innerHTML = '';
+  const stats = [
+    { val: totalDone, lbl: 'COMPLETED',   cls: totalDone > 0 ? 'accent-green' : '' },
+    { val: missed,    lbl: 'MISSED',       cls: missed > 0 ? 'accent-red' : '' },
+    { val: otoThisWeek, lbl: 'OTO EVENTS', cls: otoThisWeek > 0 ? 'accent-blue' : '' },
+    { val: totalAhead,  lbl: 'GET AHEAD',  cls: totalAhead > 0 ? 'accent-gold' : '' },
+  ];
+  stats.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'wr-stat';
+    el.innerHTML = `<div class="wr-stat-val ${s.cls}">${s.val}</div><div class="wr-stat-lbl">${s.lbl}</div>`;
+    statsEl.appendChild(el);
+  });
+
+  // Section breakdown
   const secEl = document.getElementById('wr-sections');
   secEl.innerHTML = '';
   SECTIONS.forEach(sec => {
     if (secCounts[sec.key] === 0) return;
+    const pct = Math.round(secCounts[sec.key] / maxSecCount * 100);
     const row = document.createElement('div');
     row.className = 'wr-sec-row';
     row.innerHTML = `
       <div class="wr-sec-pip" style="background:${sec.accent}"></div>
       <div class="wr-sec-label">${sec.label.toUpperCase()}</div>
+      <div class="wr-sec-bar-track">
+        <div class="wr-sec-bar-fill" style="width:0;background:${sec.accent}" data-w="${pct}%"></div>
+      </div>
       <div class="wr-sec-count">${secCounts[sec.key]}</div>`;
     secEl.appendChild(row);
   });
 
-  // Show with delay after splash clears
+  document.getElementById('wr-line').textContent = line;
+
+  // ── Show overlay ──────────────────────────────────────────────────────────
   const el = document.getElementById('weekly-report');
   el.style.display = 'flex';
-  setTimeout(() => el.classList.add('visible'), 1600);
+  el.style.opacity = '0';
+  el.classList.remove('visible');
 
-  // NOTED button
-  document.getElementById('wr-noted').addEventListener('click', () => {
-    el.style.transition = 'opacity 0.6s cubic-bezier(0.4,0,0.2,1)';
-    el.style.opacity = '0';
+  const inner = document.getElementById('wr-card');
+  inner.style.transition = 'none';
+  inner.style.transform  = 'translateY(16px)';
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    inner.style.transition = '';
+    setTimeout(() => {
+      el.classList.add('visible');
+      // Animate section bars after card appears
+      setTimeout(() => {
+        el.querySelectorAll('.wr-sec-bar-fill').forEach((bar, i) => {
+          setTimeout(() => { bar.style.width = bar.dataset.w; }, i * 80);
+        });
+      }, 500);
+    }, delay || 0);
+  }));
+
+  // NOTED — clone to avoid stacking listeners
+  const btn    = document.getElementById('wr-noted');
+  const newBtn = btn.cloneNode(true);
+  btn.parentNode.replaceChild(newBtn, btn);
+  newBtn.addEventListener('click', () => {
+    el.style.transition    = 'opacity 0.6s cubic-bezier(0.4,0,0.2,1)';
+    el.style.opacity       = '0';
     el.style.pointerEvents = 'none';
-    setTimeout(() => { el.style.display = 'none'; }, 650);
+    setTimeout(() => { el.style.display = 'none'; el.classList.remove('visible'); }, 650);
   });
 }
+
+// Monday auto-show — last completed week
+function buildWeeklyReport() {
+  const now = new Date();
+  if (now.getDay() !== 1) return;
+
+  const jan4    = new Date(now.getFullYear(), 0, 4);
+  const weekNum = Math.ceil(((now - jan4) / 864e5 + jan4.getDay() + 1) / 7);
+  const WR_KEY  = 'steward_wr_' + now.getFullYear() + '-W' + String(weekNum).padStart(2,'0');
+  if (localStorage.getItem(WR_KEY)) return;
+  localStorage.setItem(WR_KEY, '1');
+
+  const prevMon = new Date(now); prevMon.setDate(now.getDate()-7); prevMon.setHours(0,0,0,0);
+  const prevSun = new Date(prevMon); prevSun.setDate(prevMon.getDate()+6); prevSun.setHours(23,59,59,999);
+  const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate();
+  const entries = rawHistory.filter(e => e.dateKey >= dateKey(prevMon) && e.dateKey <= dateKey(prevSun));
+  _renderWeekReport(entries, fmt(prevMon) + ' — ' + fmt(prevSun), 1600, prevMon, prevSun);
+}
+
+// Manual peek — current week in progress, never touches Monday key
+function showWeekReview() {
+  const now    = new Date();
+  const curMon = new Date(now);
+  curMon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  curMon.setHours(0,0,0,0);
+  const fmt = d => DAYS[d.getDay()].slice(0,3) + ' ' + MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate();
+  const label = fmt(curMon) + ' — ' + fmt(now) + ' · in progress';
+  const entries = rawHistory.filter(e => e.dateKey >= dateKey(curMon) && e.dateKey <= dateKey(now));
+  _renderWeekReport(entries, label, 0, curMon, now);
+}
+
 
 // ─── RIGHT COLUMN: TODAY ─────────────────────────────────────────────────────
 function updateRightColumn(pct, doneCount, total, remaining, coreTasks, key, bonusDone) {
