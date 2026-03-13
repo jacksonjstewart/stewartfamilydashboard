@@ -3838,21 +3838,27 @@ function updateRightColumn(pct, doneCount, total, remaining, coreTasks, key, bon
     svg.addEventListener("animationend", () => svg.classList.remove("pulse"), { once: true });
   } else if (pct < 100) { ringFill.dataset.wasFull = ""; }
 
-  // Motivate message — data-derived, no platitudes
+  // Motivate message — tonal, not redundant with the numbers
   const msgEl = document.getElementById("motivate-msg");
   const subEl = document.getElementById("motivate-sub");
   if (total === 0) {
-    msgEl.textContent = "Nothing due."; msgEl.style.color = "#333";
-    subEl.textContent = "No tasks scheduled today";
+    msgEl.textContent = "Rest easy."; msgEl.style.color = "#333";
+    subEl.textContent = "Nothing scheduled today";
   } else if (pct === 100) {
-    msgEl.textContent = doneCount + " / " + total; msgEl.style.color = "#4ade80";
-    subEl.textContent = "All done. Clean day.";
+    msgEl.textContent = "House in order."; msgEl.style.color = "#4ade80";
+    subEl.textContent = "All done.";
+  } else if (pct >= 75) {
+    msgEl.textContent = "Almost there."; msgEl.style.color = rc;
+    subEl.textContent = remaining + " left";
+  } else if (pct >= 40) {
+    msgEl.textContent = "Underway."; msgEl.style.color = rc;
+    subEl.textContent = "Keep going";
   } else if (pct > 0) {
-    msgEl.textContent = doneCount + " / " + total; msgEl.style.color = rc;
-    subEl.textContent = remaining + " task" + (remaining !== 1 ? "s" : "") + " remaining";
+    msgEl.textContent = "Getting started."; msgEl.style.color = rc;
+    subEl.textContent = "Momentum building";
   } else {
-    msgEl.textContent = "0 / " + total; msgEl.style.color = "#555";
-    subEl.textContent = total + " task" + (total !== 1 ? "s" : "") + " today";
+    msgEl.textContent = "Ready."; msgEl.style.color = "#555";
+    subEl.textContent = "Day ahead of you";
   }
 
   // Stats
