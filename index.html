@@ -1094,7 +1094,7 @@
     </div>
   <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">v0.11.6 · pre-release</div>
+    <div id="version-tag">v0.11.7 · pre-release</div>
   </div>
   </div>
 
@@ -1930,7 +1930,9 @@ async function performCommit(_dateKey) {  // _dateKey unused — todayKey is glo
       const taskId = key.replace("_" + todayKey, "");
       const meta   = taskMetaMap[taskId] || {};
       const _ce2 = doneEntry(key);
-      entries.push({ taskId, completedAt: _ce2 ? _ce2.ts : new Date().toISOString(), dateKey: todayKey, name: meta.name||'', section: meta.section||'', emoji: meta.emoji||'', who: _ce2 && _ce2.who ? _ce2.who : currentIdentity });
+      const taskObj  = allTasks.find(function(t) { return t.id === taskId; }) || {};
+      const wasAhead = !!(taskObj.dueDate && isGetAheadTask(taskObj) && !isDueOn(taskObj, today));
+      entries.push({ taskId, completedAt: _ce2 ? _ce2.ts : new Date().toISOString(), dateKey: todayKey, name: meta.name||'', section: meta.section||'', emoji: meta.emoji||'', who: _ce2 && _ce2.who ? _ce2.who : currentIdentity, isProactive: wasAhead });
     }
   });
 
@@ -2615,9 +2617,10 @@ function renderHistory() {
   el.appendChild(heatmapWrap);
 
   // ── INSIGHT STRIP: streaks + OTO ratio (compact, always visible) ──────────
-  const otoCompleted = rawOTOEvents.filter(e => e.status === 'completed').length;
-  const otoTotal     = rawOTOEvents.length;
-  const otoPct       = otoTotal > 0 ? Math.round((otoCompleted / otoTotal) * 100) : null;
+  const otoCompleted  = rawOTOEvents.filter(e => e.status === 'completed').length;
+  const otoTotal      = rawOTOEvents.length;
+  const otoPct        = otoTotal > 0 ? Math.round((otoCompleted / otoTotal) * 100) : null;
+  const proactiveCount = filtered.filter(function(e) { return e.isProactive === true; }).length;
 
   const insightStrip = document.createElement("div");
   insightStrip.className = "insight-strip";
@@ -2633,6 +2636,10 @@ function renderHistory() {
     <div class="insight-cell">
       <div class="insight-val ${otoPct === null ? 'dim' : ''}">${otoPct !== null ? otoPct + '%' : '—'}</div>
       <div class="insight-lbl">OTO RATE</div>
+    </div>
+    <div class="insight-cell">
+      <div class="insight-val ${proactiveCount === 0 ? 'dim' : ''}" style="${proactiveCount > 0 ? 'color:#7dd3fc' : ''}">${proactiveCount}</div>
+      <div class="insight-lbl">GET AHEAD</div>
     </div>`;
   el.appendChild(insightStrip);
 
