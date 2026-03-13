@@ -1242,6 +1242,7 @@
   #wr-stats {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 8px; margin-bottom: 20px;
+    align-items: start;
   }
   .wr-stat {
     background: #0f0f0f; border: 1px solid #181818;
@@ -1260,8 +1261,61 @@
   }
   .wr-stat-val.accent-green { color: #4ade80; }
   .wr-stat-val.accent-red   { color: #f87171; }
-  .wr-stat-val.accent-blue  { color: #7dd3fc; }
   .wr-stat-val.accent-gold  { color: #facc15; }
+  .wr-stat-val.accent-blue  { color: #7dd3fc; }
+
+  /* Stat box clickable state */
+  .wr-stat.has-detail { cursor: pointer; }
+  .wr-stat.has-detail:hover { border-color: #252525; background: #111; }
+  .wr-stat.has-detail:active { transform: scale(0.97); }
+  .wr-stat-caret {
+    font-size: 8px; color: #2a2a2a;
+    margin-top: 5px; line-height: 1;
+    transition: transform 0.25s;
+  }
+  .wr-stat.open .wr-stat-caret { transform: rotate(180deg); }
+
+  /* Dropdown drawer */
+  .wr-detail {
+    display: none;
+    grid-column: 1 / -1;
+    background: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 10px;
+    padding: 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.35s cubic-bezier(0.16,1,0.3,1);
+  }
+  .wr-detail.open {
+    display: block;
+    max-height: 400px;
+  }
+  .wr-detail-inner {
+    padding: 10px 14px;
+  }
+  .wr-detail-row {
+    display: flex; align-items: baseline;
+    gap: 10px; padding: 7px 0;
+    border-bottom: 1px solid #111;
+  }
+  .wr-detail-row:last-child { border-bottom: none; }
+  .wr-detail-emoji { font-size: 13px; flex-shrink: 0; line-height: 1; }
+  .wr-detail-name {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px; font-weight: 500;
+    color: rgba(255,255,255,0.55); flex: 1; letter-spacing: 0.2px;
+  }
+  .wr-detail-day {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px; font-weight: 300; font-style: italic;
+    color: #333; flex-shrink: 0;
+  }
+  .wr-detail-empty {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px; font-style: italic;
+    color: #2a2a2a; padding: 8px 0; text-align: center;
+  }
 
   /* Section breakdown */
   #wr-sections {
@@ -1350,7 +1404,7 @@
     <!-- Wordmark -->
     <div id="wr-wordmark">
       <div id="wr-wm-the">the</div>
-      <div id="wr-wm-name">Stewart</div>
+      <div id="wr-wm-name">Stewarts</div>
     </div>
 
     <!-- Scrollable body -->
@@ -3112,13 +3166,9 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   }
   const missed = Math.max(0, totalSched - totalDone);
 
-  // OTO events completed this window
+  // OTO window bounds (used by drawer detail builder)
   const wMon = dateKey(curMonDate);
   const wEnd = dateKey(endDate) <= todayDk ? dateKey(endDate) : todayDk;
-  const otoThisWeek = rawOTOEvents.filter(e =>
-    e.status === 'completed' && e.completedAt &&
-    e.completedAt.slice(0,10) >= wMon && e.completedAt.slice(0,10) <= wEnd
-  ).length;
 
   // Section counts (non-proactive only)
   const secCounts = {};
@@ -3147,20 +3197,104 @@ function _renderWeekReport(entries, dateLabel, delay, curMonDate, endDate) {
   // Chart
   _buildWRChart(curMonDate, endDate, entries);
 
-  // Stats grid
+  // ── Stat boxes with expandable detail ────────────────────────────────────
   const statsEl = document.getElementById('wr-stats');
   statsEl.innerHTML = '';
-  const stats = [
-    { val: totalDone, lbl: 'COMPLETED',   cls: totalDone > 0 ? 'accent-green' : '' },
-    { val: missed,    lbl: 'MISSED',       cls: missed > 0 ? 'accent-red' : '' },
-    { val: otoThisWeek, lbl: 'OTO EVENTS', cls: otoThisWeek > 0 ? 'accent-blue' : '' },
-    { val: totalAhead,  lbl: 'GET AHEAD',  cls: totalAhead > 0 ? 'accent-gold' : '' },
+
+  // Build the missed task list — scheduled per day but no history entry
+  const missedItems = [];
+  for (let d = new Date(curMonDate); ; d.setDate(d.getDate()+1)) {
+    const dk = dateKey(d);
+    if (dk > todayDk) break;
+    if (dk > dateKey(endDate)) break;
+    const dayDone = new Set(nonProactive.filter(e => e.dateKey === dk).map(e => e.taskId));
+    allTasks.filter(t => t.type !== 'once' && isDueOn(t, d)).forEach(t => {
+      if (!dayDone.has(t.id)) {
+        missedItems.push({ name: t.name, emoji: t.emoji || '', day: dk, section: t.section });
+      }
+    });
+  }
+
+  // OTO detail items
+  const otoItems = rawOTOEvents.filter(e =>
+    e.status === 'completed' && e.completedAt &&
+    e.completedAt.slice(0,10) >= wMon && e.completedAt.slice(0,10) <= wEnd
+  ).map(e => ({ name: e.name, emoji: e.emoji || '', day: e.dateKey || e.completedAt.slice(0,10) }));
+
+  // GET AHEAD detail items
+  const aheadItems = proactive.map(e => ({
+    name: e.name, emoji: e.emoji || '', day: e.dateKey
+  }));
+
+  // COMPLETED detail items
+  const completedItems = nonProactive.map(e => ({
+    name: e.name, emoji: e.emoji || '', day: e.dateKey
+  }));
+
+  const dayLabel = dk => {
+    const d = new Date(dk + 'T00:00:00');
+    return DAYS[d.getDay()].slice(0,3) + ' ' + d.getDate();
+  };
+
+  const makeDetailHTML = items => {
+    if (!items.length) return `<div class="wr-detail-inner"><div class="wr-detail-empty">None recorded.</div></div>`;
+    return '<div class="wr-detail-inner">' + items.map(item =>
+      `<div class="wr-detail-row">
+        <span class="wr-detail-emoji">${item.emoji}</span>
+        <span class="wr-detail-name">${item.name}</span>
+        <span class="wr-detail-day">${dayLabel(item.day)}</span>
+      </div>`
+    ).join('') + '</div>';
+  };
+
+  const statDefs = [
+    { val: totalDone,     lbl: 'COMPLETED',  cls: totalDone > 0   ? 'accent-green' : '', items: completedItems },
+    { val: missedItems.length, lbl: 'MISSED', cls: missedItems.length > 0 ? 'accent-red' : '', items: missedItems },
+    { val: otoItems.length,    lbl: 'OTO EVENTS', cls: otoItems.length > 0 ? 'accent-gold' : '', items: otoItems },
+    { val: aheadItems.length,  lbl: 'GET AHEAD',  cls: aheadItems.length > 0 ? 'accent-blue' : '', items: aheadItems },
   ];
-  stats.forEach(s => {
-    const el = document.createElement('div');
-    el.className = 'wr-stat';
-    el.innerHTML = `<div class="wr-stat-val ${s.cls}">${s.val}</div><div class="wr-stat-lbl">${s.lbl}</div>`;
-    statsEl.appendChild(el);
+
+  // Render 4 stat boxes
+  const boxEls = [];
+  statDefs.forEach((s, i) => {
+    const box = document.createElement('div');
+    box.className = 'wr-stat' + (s.items.length > 0 ? ' has-detail' : '');
+    box.dataset.idx = i;
+    box.innerHTML = `<div class="wr-stat-val ${s.cls}">${s.val}</div>
+      <div class="wr-stat-lbl">${s.lbl}</div>
+      ${s.items.length > 0 ? '<div class="wr-stat-caret">▾</div>' : ''}`;
+    statsEl.appendChild(box);
+    boxEls.push(box);
+  });
+
+  // One shared drawer below the grid
+  const drawer = document.createElement('div');
+  drawer.className = 'wr-detail';
+  drawer.id = 'wr-drawer';
+  statsEl.appendChild(drawer);
+
+  // Click handler — toggle drawer per box
+  let openIdx = -1;
+  boxEls.forEach((box, i) => {
+    if (!statDefs[i].items.length) return;
+    box.addEventListener('click', () => {
+      if (openIdx === i) {
+        // Close
+        drawer.classList.remove('open');
+        box.classList.remove('open');
+        openIdx = -1;
+      } else {
+        // Close previous
+        if (openIdx >= 0) { boxEls[openIdx].classList.remove('open'); }
+        // Open new
+        drawer.innerHTML = makeDetailHTML(statDefs[i].items);
+        drawer.classList.add('open');
+        box.classList.add('open');
+        openIdx = i;
+        // Scroll drawer into view
+        setTimeout(() => drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+      }
+    });
   });
 
   // Section breakdown
