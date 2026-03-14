@@ -25,7 +25,7 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="Steward"/>
 <meta name="application-name" content="Steward"/>
-<link rel="manifest" href="./manifest.json"/>
+
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2742,7 +2742,7 @@ async function syncFromSheet() {
     el.textContent = sheetTasks.length ? "OFFLINE · CACHED" : "SYNC FAILED";
     el.className = "error";
   }
-  document.getElementById("loading-state").style.display = "none";
+  const _ls = document.getElementById("loading-state"); if (_ls) _ls.style.display = "none";
   ensureOneTimeIds();
   render();
   // Run catch-up once after first successful sheet load
@@ -4714,7 +4714,7 @@ function _fmtDate(dk) {
 
 const CRITERION_TASKS = {
   'veh-license': {
-    linkedTaskId: 'v08',
+    linkedTaskId: null,
     name: "Renew driver's license",
     emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true, workflowType: 'simple-date',
     getTargetDate: (c) => {
@@ -5144,6 +5144,8 @@ async function checkAndGenerateOTOs() {
             method: 'POST', headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'deleteTask', taskId: existing.id })
           });
+          // Sync immediately so the deleted task is gone before we recreate
+          await syncFromSheet();
           const idx = allTasks.indexOf(existing);
           if (idx >= 0) allTasks.splice(idx, 1);
           console.log('[DOMAINS] Replacing task for:', canonicalName, '-> OTO', correctTarget);
@@ -6109,7 +6111,7 @@ try {
   const c = JSON.parse(localStorage.getItem("hd_sheet_cache") || "null");
   if (c && c.length) {
     sheetTasks = c;
-    document.getElementById("loading-state").style.display = "none";
+    const _ls = document.getElementById("loading-state"); if (_ls) _ls.style.display = "none";
     const el = document.getElementById("sync-status");
     el.textContent = "UPDATING…"; el.className = "syncing";
     render();
