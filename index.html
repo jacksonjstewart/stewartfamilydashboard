@@ -2140,27 +2140,28 @@
 
 <script>
 // ─── SPLASH SCREEN ────────────────────────────────────────────────────────────
-// Shows once per calendar day per device. Graceful: if todayKey isn't
-// available yet we derive it inline here.
+// Plays on every fresh page load — sessionStorage ensures it only shows once
+// per browser session (not on every tab switch or soft reload within the session).
 
 // ── SPLASH SCREEN ─────────────────────────────────────────────────────────────
 (function() {
-  const TODAY_KEY = 'steward_splash_' + new Date().toISOString().slice(0,10);
-  const splashEl  = document.getElementById('splash');
+  const splashEl = document.getElementById('splash');
   if (!splashEl) return;
 
-  // Already seen today — hide instantly, no flash
-  const alreadySeen = localStorage.getItem(TODAY_KEY);
-  if (alreadySeen) {
+  // Use sessionStorage — clears when the browser/tab is fully closed and reopened
+  // Persists across soft reloads within the same session so it doesn't re-fire
+  // on a manual refresh while you're actively using the app
+  const seen = sessionStorage.getItem('steward_splash_seen');
+  if (seen) {
     splashEl.style.display = 'none';
     return;
   }
-  localStorage.setItem(TODAY_KEY, '1');
+  sessionStorage.setItem('steward_splash_seen', '1');
 
-  // Clean up old keys
+  // Clean up any old localStorage splash keys
   try {
     Object.keys(localStorage)
-      .filter(k => k.startsWith('steward_splash_') && k !== TODAY_KEY)
+      .filter(k => k.startsWith('steward_splash_'))
       .forEach(k => localStorage.removeItem(k));
   } catch(e) {}
 
