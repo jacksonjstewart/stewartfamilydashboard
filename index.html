@@ -4142,6 +4142,7 @@ function renderMonths() {
 
 const DOMAIN_DEFS = [
   { key: 'vehicle', label: 'VEHICLE', emoji: '🚗' },
+  { key: 'digital', label: 'DIGITAL', emoji: '📱' },
   { key: 'home',    label: 'HOME',    emoji: '🏠' },
   { key: 'finance', label: 'FINANCE', emoji: '💰' },
   { key: 'family',  label: 'FAMILY',  emoji: '👨‍👩‍👦' },
@@ -4331,9 +4332,22 @@ function renderDomains() {
   const el = document.getElementById('domains-content');
   el.innerHTML = '';
 
-  // Seed VEHICLE criteria if sheet is empty
+  // Seed if empty, or if new domains have no criteria yet
+  const hasDig = rawHealthCriteria.some(c => c.domain === 'digital');
   if (!rawHealthCriteria.length) {
     _seedAndRender(el);
+    return;
+  }
+  if (!hasDig) {
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'seedDigitalCriteria' })
+    }).then(r => r.json()).then(async () => {
+      const r2 = await fetch(API_URL);
+      const d2 = await r2.json();
+      rawHealthCriteria = Array.isArray(d2.healthCriteria) ? d2.healthCriteria : [];
+      try { const c = JSON.parse(localStorage.getItem('hd_history_cache')||'{}'); c.hc = rawHealthCriteria; localStorage.setItem('hd_history_cache', JSON.stringify(c)); } catch(e) {}
+      renderDomains();
+    }).catch(() => {});
     return;
   }
 
@@ -4542,6 +4556,44 @@ const CRITERION_TASKS = {
     emoji: '🚗', freq: 'biweekly', type: '',
     getTargetDate: null, dow: 1,
     notes: 'Vacuum, wipe dash, clean windows inside, check glove box docs present.',
+  },
+  // ── DIGITAL ──────────────────────────────────────────────────────────────────
+  'dig-devices': {
+    linkedTaskId: null,
+    name: 'Annual device review',
+    emoji: '📱', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'Pixel 9A · Dell XPS 13 · NZXT Desktop — all three devices. January annual check.',
+  },
+  'dig-backup': {
+    linkedTaskId: null,
+    name: 'Verify USB drive backups',
+    emoji: '💾', freq: 'yearly', type: '',
+    // Quarterly: surface via dueDate on Jun 1, Sep 1, Dec 1, Mar 1
+    // Using simple yearly dueDate for GET AHEAD — actual recurrence managed via criterion interval
+    dueDate: '06-01', yearMonth: 6, dotm: 1,
+    notes: 'Connect both 1TB USB drives, confirm backups current and drives readable.',
+  },
+  'dig-security': {
+    linkedTaskId: null,
+    name: 'Account security review',
+    emoji: '🔐', freq: 'yearly', type: '',
+    dueDate: '04-01', yearMonth: 4, dotm: 1,
+    notes: 'Password manager, 2FA, recovery options, breach check. April.',
+  },
+  'dig-audit': {
+    linkedTaskId: null,
+    name: 'Digital security audit',
+    emoji: '🔒', freq: 'yearly', type: '',
+    dueDate: '10-01', yearMonth: 10, dotm: 1,
+    notes: 'App permissions, connected accounts, login activity, Wi-Fi. October.',
+  },
+  'dig-files': {
+    linkedTaskId: null,
+    name: 'Digital files declutter & organize',
+    emoji: '🗂️', freq: 'yearly', type: '',
+    dueDate: '07-01', yearMonth: 7, dotm: 1,
+    notes: 'Downloads, desktop, photos, documents — clear and organize. January & July.',
   },
 };
 
@@ -4917,12 +4969,12 @@ function _openDateShiftModal(c, linked) {
 async function _seedAndRender(el) {
   el.innerHTML = '<div class="domains-empty">Setting up health criteria…</div>';
   try {
-    const res  = await fetch(API_URL, {
-      method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'seedVehicleCriteria' })
-    });
-    const data = await res.json();
-    if (data.ok) {
+    // Seed all domains — each seed is idempotent (skips existing rows)
+    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'seedVehicleCriteria' }) });
+    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'seedDigitalCriteria' }) });
+    {
       // Reload health criteria from sheet
       const res2  = await fetch(API_URL);
       const data2 = await res2.json();
