@@ -4461,6 +4461,14 @@ function closeDomainModal() {
 function renderDomains() {
   const el = document.getElementById('domains-content');
   el.innerHTML = '';
+  try { _renderDomainsInner(el); }
+  catch(err) {
+    console.error('[STEWARD] renderDomains crashed:', err);
+    el.innerHTML = `<div class="domains-empty" style="color:#f87171">Domain render error: ${err.message}<br><small style="color:#555">${err.stack ? err.stack.split('\n')[1] : ''}</small></div>`;
+  }
+}
+
+function _renderDomainsInner(el) {
 
   // Seed if empty, or if new domains have no criteria yet
   // Seed any missing domains — all seeds are idempotent
