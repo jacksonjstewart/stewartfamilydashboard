@@ -3326,7 +3326,8 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
 
       // OTO linked to a health criterion that needs date entry — intercept and open date modal
       console.log('[STEWARD] row click — task.type:', task.type, 'task.id:', task.id, 'task.name:', task.name);
-      if (task.type === 'once' && !doneLog[task.id + '_' + todayKey]
+      const _isOTO = task.type === 'once' || task.freq === 'once' || task.targetDate;
+      if (_isOTO && !doneLog[task.id + '_' + todayKey]
           && typeof rawHealthCriteria !== 'undefined'
           && typeof CRITERION_TASKS !== 'undefined') {
         console.log('[STEWARD] OTO intercept check — rawHealthCriteria.length:', rawHealthCriteria.length);
@@ -3334,8 +3335,11 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
         for (const c of rawHealthCriteria) {
           const def = CRITERION_TASKS[c.id];
           if (!def) continue;
-          console.log('[STEWARD] checking criterion:', c.id, 'def.linkedTaskId:', def.linkedTaskId, 'def.name:', def.name);
-          if (def.linkedTaskId === task.id || def.name === task.name) { crit = c; break; }
+          // Match by linkedTaskId (most reliable) or case-insensitive name
+          const nameMatch = def.name && task.name &&
+            def.name.toLowerCase().replace(/['']/g,"'") === task.name.toLowerCase().replace(/['']/g,"'");
+          console.log('[STEWARD] checking criterion:', c.id, 'def.linkedTaskId:', def.linkedTaskId, 'nameMatch:', nameMatch);
+          if (def.linkedTaskId === task.id || nameMatch) { crit = c; break; }
         }
         console.log('[STEWARD] crit found:', crit ? crit.id : 'null');
         if (crit) {
@@ -4711,7 +4715,7 @@ function _fmtDate(dk) {
 const CRITERION_TASKS = {
   'veh-license': {
     linkedTaskId: 'v08',
-    name: "Renew driver's licence",
+    name: "Renew driver's license",
     emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true, workflowType: 'simple-date',
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
