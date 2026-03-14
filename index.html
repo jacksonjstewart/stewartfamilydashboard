@@ -4558,42 +4558,47 @@ const CRITERION_TASKS = {
     notes: 'Vacuum, wipe dash, clean windows inside, check glove box docs present.',
   },
   // ── DIGITAL ──────────────────────────────────────────────────────────────────
-  'dig-devices': {
+  'dig-phone': {
     linkedTaskId: null,
-    name: 'Annual device review',
+    name: 'Pixel 9A annual check',
     emoji: '📱', freq: 'yearly', type: '',
     dueDate: '01-01', yearMonth: 1, dotm: 1,
-    notes: 'Pixel 9A · Dell XPS 13 · NZXT Desktop — all three devices. January annual check.',
+    notes: 'Battery, storage, OS, physical condition.',
+  },
+  'dig-computers': {
+    linkedTaskId: null,
+    name: 'Computers annual check',
+    emoji: '💻', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'Dell XPS 13 and NZXT desktop — OS, storage, security, physical.',
   },
   'dig-backup': {
     linkedTaskId: null,
     name: 'Verify USB drive backups',
     emoji: '💾', freq: 'yearly', type: '',
-    // Quarterly: surface via dueDate on Jun 1, Sep 1, Dec 1, Mar 1
-    // Using simple yearly dueDate for GET AHEAD — actual recurrence managed via criterion interval
     dueDate: '06-01', yearMonth: 6, dotm: 1,
-    notes: 'Connect both 1TB USB drives, confirm backups current and drives readable.',
+    notes: 'Both 1TB USB drives — backup current and readable.',
   },
   'dig-security': {
     linkedTaskId: null,
     name: 'Account security review',
     emoji: '🔐', freq: 'yearly', type: '',
     dueDate: '04-01', yearMonth: 4, dotm: 1,
-    notes: 'Password manager, 2FA, recovery options, breach check. April.',
+    notes: 'Password manager, 2FA, recovery options, breach check.',
   },
   'dig-audit': {
     linkedTaskId: null,
     name: 'Digital security audit',
     emoji: '🔒', freq: 'yearly', type: '',
     dueDate: '10-01', yearMonth: 10, dotm: 1,
-    notes: 'App permissions, connected accounts, login activity, Wi-Fi. October.',
+    notes: 'App permissions, connected apps, login activity, Wi-Fi.',
   },
   'dig-files': {
     linkedTaskId: null,
     name: 'Digital files declutter & organize',
     emoji: '🗂️', freq: 'yearly', type: '',
     dueDate: '07-01', yearMonth: 7, dotm: 1,
-    notes: 'Downloads, desktop, photos, documents — clear and organize. January & July.',
+    notes: 'Downloads, desktop, photos, documents.',
   },
 };
 
@@ -4857,39 +4862,92 @@ async function _criterionAction(criterionId) {
   if (!c) return;
   const linked = _criterionLinkedTask(c);
 
-  // ── Recurring task (e.g. car interior) ───────────────────────────────────
-  // Mark the linked task done for today via the existing toggle system
+  // ── If criterion has subChecks → always walk through modal first ──────────
+  // This is the primary validation path — user must confirm each check
+  if (c.subChecks) {
+    try {
+      const checks = JSON.parse(c.subChecks);
+      if (checks && checks.length > 0) {
+        _openSubCheckModal(c, linked);
+        return;
+      }
+    } catch(e) {}
+  }
+
+  // ── Recurring task with no subChecks — mark done silently ─────────────────
   if (linked && linked.type !== 'once' && linked.freq !== 'once') {
     const key    = linked.id + '_' + todayKey;
     const isDone = !!doneLog[key];
     if (!isDone) {
-      // Mark done — same pathway as tapping the task row
       const ts = new Date().toISOString();
       doneLog[key] = { ts, who: currentIdentity };
       _localOrigin.add(key);
       saveDone(doneLog);
       renderInPlace();
       writeCheckToSheet(linked.id, ts);
-      // Update lastCompleted in HealthCriteria so criterion goes green
       const updated = { ...c, lastCompleted: todayKey };
       await _saveAndRefresh(updated);
     } else {
-      // Already done today — just refresh domains display
       renderDomains();
     }
     return;
   }
 
-  // ── Date-sensitive OTO (licence, registration, insurance, oil, tires) ────
-  // Need new expiry/completion date → modal
-  if (linked && (linked.type === 'once' || linked.freq === 'once') || c.workflowType !== 'recurring-modal') {
-    _openDateShiftModal(c, linked);
-    return;
+  // ── Date-sensitive OTO — open date shift modal ────────────────────────────
+  _openDateShiftModal(c, linked);
+}
+
+// Sub-check walkthrough modal — shown when criterion has subChecks defined
+function _openSubCheckModal(c, linked) {
+  let checks = [];
+  try { checks = JSON.parse(c.subChecks); } catch(e) { return; }
+
+  const overlay = document.getElementById('domain-modal-overlay');
+  document.getElementById('dm-title').textContent    = c.domain.toUpperCase() + ' · ' + c.category.toUpperCase();
+  document.getElementById('dm-subtitle').textContent = c.criterion;
+
+  const body = document.getElementById('dm-body');
+  body.innerHTML = '';
+
+  // Instructions banner if present
+  if (c.instructions) {
+    const inst = document.createElement('div');
+    inst.style.cssText = 'font-family:\'Outfit\',sans-serif;font-size:10px;color:#555;line-height:1.6;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #1a1a1a;';
+    inst.textContent = c.instructions;
+    body.appendChild(inst);
   }
 
-  // ── Fallback: open standard domain modal ─────────────────────────────────
-  openDomainModal(criterionId);
+  // Render checklist
+  _renderSubChecks(body, c);
+
+  const btn    = document.getElementById('dm-confirm');
+  const newBtn = btn.cloneNode(true);
+  btn.parentNode.replaceChild(newBtn, btn);
+
+  newBtn.textContent = 'CONFIRM COMPLETE';
+  newBtn.onclick = async () => {
+    // Mark linked task done for today
+    if (linked) {
+      const key = linked.id + '_' + todayKey;
+      if (!doneLog[key]) {
+        const ts = new Date().toISOString();
+        doneLog[key] = { ts, who: currentIdentity };
+        _localOrigin.add(key);
+        saveDone(doneLog);
+        renderInPlace();
+        writeCheckToSheet(linked.id, ts);
+      }
+    }
+    // Update criterion lastCompleted → goes green
+    const updated = { ...c, lastCompleted: todayKey };
+    await _saveAndRefresh(updated);
+    closeDomainModal();
+  };
+
+  overlay.classList.add('open');
+  document.getElementById('domain-modal').scrollTop = 0;
 }
+
 
 // Modal for date-sensitive completions — asks for new expiry/next-due date
 function _openDateShiftModal(c, linked) {
