@@ -4511,14 +4511,12 @@ function renderDomains() {
         const linkedHTML = linkedTask
           ? `<div class="criterion-linked-task">
               <span class="criterion-linked-dot ${linkedTask.type === 'once' ? 'oto' : 'rec'}"></span>
-              <span class="criterion-linked-name">${linkedTask.name.replace('[HEALTH] ','')}</span>
-              <span class="criterion-linked-date">${linkedTask.targetDate ? '· ' + _fmtDate(linkedTask.targetDate) : linkedTask.freq || ''}</span>
+              <span class="criterion-linked-name">${linkedTask.name}</span>
+              <span class="criterion-linked-date">${linkedTask.targetDate ? '· ' + _fmtDate(linkedTask.targetDate) : linkedTask.freq ? '· ' + linkedTask.freq : ''}</span>
              </div>`
-          : status !== 'green'
-            ? `<div class="criterion-linked-task generating">
-                <span class="criterion-linked-name" style="color:#2a2a2a;font-style:italic">Generating task on next sync…</span>
-               </div>`
-            : '';
+          : `<div class="criterion-linked-task generating">
+              <span class="criterion-linked-name" style="color:#2a2a2a;font-style:italic">Linked task will generate on next sync…</span>
+             </div>`;
 
         detail.innerHTML = `
           <div class="criterion-detail-status">${statusLine}</div>
@@ -4559,92 +4557,143 @@ function _fmtDate(dk) {
   return MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
 }
 
-// ─── DOMAIN HEALTH: OTO GENERATION ───────────────────────────────────────────
-// Runs on every load. For each health criterion that is amber or red and has
-// no corresponding OTO already in sheetTasks or customTasks, creates one.
-// Idempotent — matches by a canonical task name tag so it never duplicates.
+// ─── DOMAIN HEALTH: TASK GENERATION ──────────────────────────────────────────
+// Runs on every load after sheet data is available.
+// Each health criterion has a defined task — either a recurring task that keeps
+// it healthy, or a date-triggered OTO that prompts action when due.
+// GREEN criteria still need future tasks — green means healthy NOW, not forever.
+// Idempotent — matches by canonical task name, never duplicates.
 
-function _criterionOTOName(c) {
-  // Canonical OTO name format — used to detect duplicates
-  return '[HEALTH] ' + c.criterion;
+// Per-criterion task definitions — what task keeps this criterion healthy
+const CRITERION_TASKS = {
+  'veh-license': {
+    name: 'Renew driver\'s licence',
+    emoji: '🪪', freq: 'once', type: 'once',
+    getTargetDate: (c) => c.nextDue || dateKey(new Date()),
+    notes: 'Go to any Alberta registry agent. Bring current licence and payment. No appointment needed.',
+  },
+  'veh-registration': {
+    name: 'Renew vehicle registration',
+    emoji: '📋', freq: 'once', type: 'once',
+    getTargetDate: (c) => c.nextDue || dateKey(new Date()),
+    notes: 'Renew at any Alberta registry agent. Bring current registration and insurance.',
+  },
+  'veh-insurance': {
+    name: 'Confirm insurance auto-renewal',
+    emoji: '🛡️', freq: 'once', type: 'once',
+    // Prompt 30 days before renewal to confirm it went through
+    getTargetDate: (c) => {
+      if (!c.nextDue) return dateKey(new Date());
+      const d = new Date(c.nextDue + 'T00:00:00');
+      d.setDate(d.getDate() - 14);
+      return dateKey(d);
+    },
+    notes: 'Verify auto-renewal confirmation received from Belair/Johnson. Confirm payment processed. Update next renewal date in DOMAINS.',
+  },
+  'veh-oil-change': {
+    name: 'Book oil change & mechanic inspection',
+    emoji: '🔧', freq: 'once', type: 'once',
+    // Prompt 30 days before next due
+    getTargetDate: (c) => {
+      if (!c.nextDue) return dateKey(new Date());
+      const d = new Date(c.nextDue + 'T00:00:00');
+      d.setDate(d.getDate() - (parseInt(c.warningDays) || 30));
+      return dateKey(d);
+    },
+    notes: 'Book at Toyota of the Trail (free lifetime oil changes). Record booking date in DOMAINS → Oil Change criterion.',
+  },
+  'veh-tires': {
+    name: 'Check tire condition & pressure',
+    emoji: '🔄', freq: 'once', type: 'once',
+    getTargetDate: (c) => {
+      if (!c.nextDue) return dateKey(new Date());
+      const d = new Date(c.nextDue + 'T00:00:00');
+      d.setDate(d.getDate() - (parseInt(c.warningDays) || 21));
+      return dateKey(d);
+    },
+    notes: 'Inspect tread depth, sidewalls, and pressure. Check for even wear. Record outcome in DOMAINS → Tire Condition criterion.',
+  },
+  'veh-interior': {
+    name: 'Car interior clean & organized',
+    emoji: '🚗', freq: 'biweekly', type: '',
+    // Biweekly Monday — dow=1, anchor to next Monday
+    getTargetDate: null,
+    dow: 1,
+    notes: 'Vacuum, wipe dash, clean windows inside, check glove box docs present. Complete checklist in DOMAINS → Interior Clean criterion.',
+  },
+};
+
+function _criterionCanonicalName(c) {
+  const def = CRITERION_TASKS[c.id];
+  return def ? def.name : c.criterion;
 }
 
 function _criterionLinkedTask(c) {
-  // Find an existing task in sheetTasks/customTasks that matches this criterion
-  const canonicalName = _criterionOTOName(c);
+  const name     = _criterionCanonicalName(c);
   const allTasks = [...sheetTasks, ...customTasks];
-  return allTasks.find(t => t.name === canonicalName) || null;
-}
-
-function _criterionTargetDate(c) {
-  // Determine what targetDate to use for the generated OTO
-  if (c.workflowType === 'two-stage' && !c.bookedDate) {
-    // For two-stage: target date is the warning start date (prompt to book ahead)
-    if (c.nextDue) {
-      const due  = new Date(c.nextDue + 'T00:00:00');
-      const warn = parseInt(c.warningDays) || 30;
-      due.setDate(due.getDate() - warn);
-      return dateKey(due);
-    }
-  }
-  if (c.nextDue) return c.nextDue;
-  if (c.lastCompleted) {
-    // Calculate next due from last completed
-    const last = new Date(c.lastCompleted + 'T00:00:00');
-    const days = (parseInt(c.interval)||1) *
-      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7);
-    const next = new Date(last.getTime() + days * 864e5);
-    return dateKey(next);
-  }
-  return dateKey(new Date()); // fallback: today
+  // Match by name (exact) — works for both OTO and recurring
+  return allTasks.find(t => t.name === name) || null;
 }
 
 async function checkAndGenerateOTOs() {
   if (!rawHealthCriteria.length) return;
   const allTasks = [...sheetTasks, ...customTasks];
+  let generated  = 0;
 
   for (const c of rawHealthCriteria) {
-    const status = evaluateCriterion(c);
-    // Only generate for amber or red — green is healthy, no OTO needed
-    if (status === 'green') continue;
+    const def = CRITERION_TASKS[c.id];
+    if (!def) continue; // no task definition for this criterion yet
 
-    // Check if an OTO for this criterion already exists
-    const canonicalName = _criterionOTOName(c);
-    const exists = allTasks.some(t => t.name === canonicalName && t.type === 'once');
+    const canonicalName = def.name;
+    // Check if task already exists (any type — OTO or recurring)
+    const exists = allTasks.some(t => t.name === canonicalName);
     if (exists) continue;
 
-    // Build the OTO task
-    const targetDate = _criterionTargetDate(c);
     const sectionMap = { vehicle: 'vehicle', home: 'home', finance: 'finance', family: 'family' };
     const task = {
-      name:       canonicalName,
-      emoji:      '🔔',
-      section:    sectionMap[c.domain] || 'home',
-      freq:       'once',
-      type:       'once',
-      notes:      c.instructions || '',
-      targetDate: targetDate,
+      name:    canonicalName,
+      emoji:   def.emoji || '🔔',
+      section: sectionMap[c.domain] || 'home',
+      freq:    def.freq,
+      type:    def.type || '',
+      notes:   def.notes || '',
     };
+
+    // OTO gets a targetDate; recurring gets frequency fields
+    if (def.type === 'once') {
+      task.targetDate = def.getTargetDate(c);
+    } else if (def.freq === 'biweekly') {
+      // biweekly: next occurrence of the given dow
+      task.dow = def.dow !== undefined ? def.dow : 1;
+      // anchorDate: next Monday from today
+      const anchor = new Date();
+      const daysUntil = ((def.dow || 1) - anchor.getDay() + 7) % 7 || 7;
+      anchor.setDate(anchor.getDate() + daysUntil);
+      task.anchorDate = dateKey(anchor);
+    }
 
     try {
       const res  = await fetch(API_URL, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'addTask', task })
+        body:    JSON.stringify({ action: 'addTask', task })
       });
       const data = await res.json();
       if (data.ok) {
-        console.log('[DOMAINS] OTO generated for:', c.criterion, '→', targetDate);
+        console.log('[DOMAINS] Task generated:', canonicalName);
+        generated++;
       }
     } catch(err) {
-      console.warn('[DOMAINS] OTO generation failed for:', c.criterion, err);
+      console.warn('[DOMAINS] Task generation failed for:', canonicalName, err);
     }
   }
 
-  // Refresh sheet tasks so linked tasks appear immediately
-  await syncFromSheet();
-  if (currentView === 'domains') renderDomains();
+  if (generated > 0) {
+    await syncFromSheet();
+    if (currentView === 'domains') renderDomains();
+  }
 }
+
 
 async function _seedAndRender(el) {
   el.innerHTML = '<div class="domains-empty">Setting up health criteria…</div>';
