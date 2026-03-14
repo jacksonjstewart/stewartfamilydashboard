@@ -4617,11 +4617,19 @@ function evaluateCriterion(c) {
   const activeToday = linked && (() => {
     const isDone = !!doneLog[linked.id + '_' + todayKey];
     if (isDone) return false;
-    if (linked.type === 'once' && linked.targetDate === todayDk) return true;
+
+    // OTO: only active today if targetDate is today
+    if (linked.type === 'once') {
+      return linked.targetDate === todayDk;
+    }
+
+    // Recurring GET AHEAD: has dueDate (MM-DD annual), within lead window
     if (linked.dueDate) {
       const d = daysUntilDue(linked);
       return d !== null && d <= GET_AHEAD_LEAD_DAYS;
     }
+
+    // Recurring landing today
     return isDueOn(linked, new Date(todayDk + 'T00:00:00'));
   })();
 
