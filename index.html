@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>Steward · v1.0</title>
+<title>Steward · v0.5</title>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1782,7 +1782,27 @@
     vertical-align: middle; margin-right: 4px;
   }
 
-    /* Domains empty state */
+    /* ── Task info button ── */
+  .task-info-btn {
+    background: none; border: 1px solid #1e1e1e; border-radius: 4px;
+    color: #333; font-size: 9px; font-family: 'Outfit', sans-serif;
+    font-style: italic; font-weight: 600; letter-spacing: 0.5px;
+    padding: 2px 5px; cursor: pointer; flex-shrink: 0;
+    margin-right: 4px; transition: all 0.15s ease;
+    line-height: 1;
+  }
+  .task-info-btn:hover { color: #7dd3fc; border-color: rgba(125,211,252,0.3); }
+
+  /* ── Health stamp in task dropdown ── */
+  .task-health-stamp {
+    font-family: 'Outfit', sans-serif;
+    font-size: 8px; font-weight: 500; letter-spacing: 0.8px;
+    color: #222; text-align: right;
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px solid #111;
+  }
+
+  /* Domains empty state */
   .domains-empty {
     font-family: 'Cormorant Garamond', serif;
     font-size: 15px; font-style: italic; color: #2a2a2a;
@@ -1803,7 +1823,7 @@
     </div>
   </div>
   <div id="splash-rule"></div>
-  <div id="splash-sub">STEWARD · v1.0</div>
+  <div id="splash-sub">STEWARD · v0.5</div>
 </div>
 
 <!-- ── WEEKLY REPORT ──────────────────────────────────────────────────────── -->
@@ -2124,7 +2144,7 @@
 
     <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">STEWARD · v1.0</div>
+    <div id="version-tag">STEWARD · v0.5</div>
   </div>
   </div>
 
@@ -3127,65 +3147,175 @@ setInterval(updateClock, 1000);
 updateClock();
 
 // ─── SHARED TASK ROW BUILDER ──────────────────────────────────────────────────
+
+// ─── AI INFO MODAL ────────────────────────────────────────────────────────────
+// Opens an AI-generated walkthrough for any task item.
+// Uses the Anthropic API to generate task-specific guidance.
+
+async function _openInfoModal(task) {
+  // Re-use domain modal overlay for the info panel
+  const overlay  = document.getElementById('domain-modal-overlay');
+  const modal    = document.getElementById('domain-modal');
+  const titleEl  = document.getElementById('dm-title');
+  const subEl    = document.getElementById('dm-subtitle');
+  const bodyEl   = document.getElementById('dm-body');
+  const confirmEl = document.getElementById('dm-confirm');
+
+  titleEl.textContent = 'HOW TO · TASK GUIDE';
+  subEl.textContent   = task.name;
+  bodyEl.innerHTML    = '<div style="color:#333;font-size:11px;font-family:'Outfit',sans-serif;padding:20px 0;text-align:center;letter-spacing:1px">GENERATING GUIDE…</div>';
+  confirmEl.textContent = 'CLOSE';
+  confirmEl.onclick     = () => closeDomainModal();
+
+  overlay.classList.add('open');
+  modal.scrollTop = 0;
+
+  // Build context-aware prompt
+  const freqStr  = freqLabel(task) || (task.freq || '');
+  const notesStr = task.notes ? `\n\nFamily notes: ${task.notes}` : '';
+  const prompt   = `You are a helpful home management assistant for a young family in Edmonton, Alberta, Canada.
+
+Generate a concise, practical guide for this household task:
+Task: ${task.name}
+Frequency: ${freqStr}
+Section: ${task.section}${notesStr}
+
+Respond in this exact format (keep it brief and scannable):
+
+**Why it matters**
+1-2 sentences on why this is important.
+
+**How to do it**
+3-5 numbered steps, each one sentence.
+
+**Tips**
+1-2 practical tips specific to this task.
+
+${task.section === 'vehicle' ? '**For your 2025 Toyota Corolla**\nAny vehicle-specific notes.' : ''}
+${task.section === 'digital' ? '**For your devices**\nPixel 9A, Dell XPS 13, or NZXT desktop as relevant.' : ''}
+
+Keep the total response under 200 words. No fluff.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.map(b => b.text || '').join('') || 'Unable to generate guide.';
+
+    // Render markdown-ish response
+    const boldify = s => s
+      .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#c8c8c8;font-weight:600">$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>');
+    const rendered = text.split('
+').map(line => {
+      if (!line.trim()) return '';
+      if (line.match(/^\d+\./)) return `<li style="margin:4px 0">${boldify(line.replace(/^\d+\.\s*/,''))}</li>`;
+      if (line.startsWith('**') && line.endsWith('**')) return `<div style="font-family:'Outfit',sans-serif;font-size:8px;font-weight:700;letter-spacing:2px;color:#444;margin:14px 0 6px;text-transform:uppercase">${line.replace(/\*\*/g,'')}</div>`;
+      return `<p style="margin:3px 0">${boldify(line)}</p>`;
+    }).join('');
+
+    bodyEl.innerHTML = `<div style="font-family:'Cormorant Garamond',serif;font-size:13px;font-weight:300;color:#666;line-height:1.7">${rendered}</div>`;
+  } catch(err) {
+    bodyEl.innerHTML = `<div style="color:#555;font-size:11px;font-family:'Outfit',sans-serif">Unable to generate guide right now. Check your connection and try again.</div>`;
+  }
+}
+
 function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, aheadBadgeText) {
   const hasNotes = !!(task.notes && task.notes.trim());
-  let notesHTML = "";
+  let notesHTML = '';
   if (hasNotes) {
-    const lines   = task.notes.trim().split(/\n|\|/);
-    const boldify = s => s.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#c8c8c8;font-weight:600">$1</strong>');
-    const bullets = lines.filter(l => l.trim().startsWith("- "));
-    const prose   = lines.filter(l => !l.trim().startsWith("- ") && l.trim());
-    let inner = "";
-    if (prose.length)   inner += prose.map(l => `<p>${boldify(l.trim())}</p>`).join("");
-    if (bullets.length) inner += "<ul>" + bullets.map(l => `<li>${boldify(l.trim().slice(2))}</li>`).join("") + "</ul>";
-    notesHTML = `<div class="task-notes">${inner}</div>`;
+    const noteLines = task.notes.trim().split(/\n|\|/);
+    const boldify   = s => s.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#c8c8c8;font-weight:600">$1</strong>');
+    const bullets   = noteLines.filter(l => l.trim().startsWith('- '));
+    const prose     = noteLines.filter(l => !l.trim().startsWith('- ') && l.trim());
+    let inner = '';
+    if (prose.length)   inner += prose.map(l => `<p>${boldify(l.trim())}</p>`).join('');
+    if (bullets.length) inner += '<ul>' + bullets.map(l => `<li>${boldify(l.trim().slice(2))}</li>`).join('') + '</ul>';
+    notesHTML = inner;
   }
-  const secObj  = SECTIONS.find(s => s.key === task.section);
-  const pillHTML = isOnce && secObj
+
+  // Health indicator stamp — look up which criterion this task is linked to
+  const healthStamp = (() => {
+    if (!task.id) return '';
+    // Check CRITERION_TASKS for a matching linkedTaskId or canonical name
+    for (const [critId, def] of Object.entries(CRITERION_TASKS)) {
+      if (def.linkedTaskId === task.id || def.name === task.name) {
+        const crit = rawHealthCriteria.find(c => c.id === critId);
+        const domainLabel = critId.split('-')[0].toUpperCase();
+        const critName    = crit ? crit.criterion : critId;
+        return `<div class="task-health-stamp">${task.id} · ${domainLabel}: ${critName}</div>`;
+      }
+    }
+    // No match found — show just the ID
+    return `<div class="task-health-stamp">${task.id}</div>`;
+  })();
+
+  const secObj       = SECTIONS.find(s => s.key === task.section);
+  const pillHTML     = isOnce && secObj
     ? `<span class="section-pill" style="background:${secObj.accent}22;color:${secObj.accent};border:1px solid ${secObj.accent}33">${secObj.label.toUpperCase()}</span>`
     : '';
   const aheadBadgeHTML = aheadBadgeText
     ? `<span class="section-pill ahead-badge">${aheadBadgeText}</span>`
     : '';
 
-  const wrap = document.createElement("div");
-  wrap.className = "task-wrap";
+  const wrap = document.createElement('div');
+  wrap.className = 'task-wrap';
   wrap.dataset.taskId = task.id;
-  const row = document.createElement("div");
+  const row = document.createElement('div');
   row.dataset.id = task.id;
   const isOverdue = !isDone && isOnce && task.targetDate && isOTOOverdue(task);
-  row.className = "task-row"
-    + (isDone          ? " done"     : "")
-    + (hasNotes        ? ""          : " no-notes")
-    + (isOnce          ? " once"     : "")
-    + (isOverdue       ? " overdue"  : "")
-    + (isReadOnly      ? " readonly" : "")
-    + (aheadBadgeText  ? " ahead"    : "");
   const isCarried = !isDone && pushForwardList.includes(task.id);
+  row.className = 'task-row'
+    + (isDone         ? ' done'     : '')
+    + (isOnce         ? ' once'     : '')
+    + (isOverdue      ? ' overdue'  : '')
+    + (isReadOnly     ? ' readonly' : '')
+    + (aheadBadgeText ? ' ahead'    : '');
+
   row.innerHTML = `
     <div class="task-checkbox"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 3.5l3 3 5-5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <span class="task-emoji">${task.emoji}</span>
     <div style="flex:1">
       <div class="task-name">${isCarried ? '<span class="carry-dot"></span>' : ''}${task.name}</div>
-      <div class="task-freq">${isOverdue ? "Due yesterday · overdue" : (stampText || freqLabel(task))}</div>
+      <div class="task-freq">${isOverdue ? 'Due yesterday · overdue' : (stampText || freqLabel(task))}</div>
     </div>
     ${pillHTML}${aheadBadgeHTML}
     ${isOverdue ? '<span class="overdue-badge">OVERDUE</span>' : ''}
-    ${hasNotes ? `<div class="task-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>` : ""}`;
+    <button class="task-info-btn" data-task-id="${task.id}" title="How to do this">ℹ</button>
+    <div class="task-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none"><path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
 
   if (!isReadOnly) {
-    row.addEventListener("click", (e) => {
-      if (e.target.closest(".task-chevron")) { wrap.classList.toggle("open"); return; }
-      if (e.target.closest(".task-remove")) return;
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.task-info-btn')) {
+        e.stopPropagation();
+        _openInfoModal(task);
+        return;
+      }
+      if (e.target.closest('.task-chevron')) { wrap.classList.toggle('open'); return; }
+      if (e.target.closest('.task-remove')) return;
       toggleTask(task.id);
     });
-  } else if (hasNotes) {
-    row.addEventListener("click", (e) => {
-      if (e.target.closest(".task-chevron")) { wrap.classList.toggle("open"); }
+  } else {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.task-info-btn')) { e.stopPropagation(); _openInfoModal(task); return; }
+      if (e.target.closest('.task-chevron'))  { wrap.classList.toggle('open'); }
     });
   }
+
+  // Always render the dropdown — even if no notes, always has health stamp
+  const notesDiv = document.createElement('div');
+  notesDiv.className = 'task-notes';
+  if (notesHTML) notesDiv.innerHTML = notesHTML;
+  notesDiv.insertAdjacentHTML('beforeend', healthStamp);
   wrap.appendChild(row);
-  if (hasNotes) wrap.insertAdjacentHTML("beforeend", notesHTML);
+  wrap.appendChild(notesDiv);
   return wrap;
 }
 
@@ -4333,15 +4463,19 @@ function renderDomains() {
   el.innerHTML = '';
 
   // Seed if empty, or if new domains have no criteria yet
-  const hasDig = rawHealthCriteria.some(c => c.domain === 'digital');
-  if (!rawHealthCriteria.length) {
-    _seedAndRender(el);
-    return;
-  }
-  if (!hasDig) {
-    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'seedDigitalCriteria' })
-    }).then(r => r.json()).then(async () => {
+  // Seed any missing domains — all seeds are idempotent
+  const domainKeys    = ['vehicle','digital','home','finance','family'];
+  const seedActions   = {
+    vehicle: 'seedVehicleCriteria', digital: 'seedDigitalCriteria',
+    home: 'seedHomeCriteria', finance: 'seedFinanceCriteria', family: 'seedFamilyCriteria'
+  };
+  const missingDomains = domainKeys.filter(k => !rawHealthCriteria.some(c => c.domain === k));
+  if (!rawHealthCriteria.length) { _seedAndRender(el); return; }
+  if (missingDomains.length > 0) {
+    Promise.all(missingDomains.map(k =>
+      fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: seedActions[k] }) })
+    )).then(async () => {
       const r2 = await fetch(API_URL);
       const d2 = await r2.json();
       rawHealthCriteria = Array.isArray(d2.healthCriteria) ? d2.healthCriteria : [];
@@ -4350,6 +4484,7 @@ function renderDomains() {
     }).catch(() => {});
     return;
   }
+
 
   const activeDomains = DOMAIN_DEFS.filter(d =>
     rawHealthCriteria.some(c => c.domain === d.key)
@@ -4599,6 +4734,116 @@ const CRITERION_TASKS = {
     emoji: '🗂️', freq: 'yearly', type: '',
     dueDate: '07-01', yearMonth: 7, dotm: 1,
     notes: 'Downloads, desktop, photos, documents.',
+  },
+
+  // ── HOME ─────────────────────────────────────────────────────────────────────
+  'home-systems': {
+    linkedTaskId: null, name: 'Home systems & maintenance check',
+    emoji: '🔧', freq: 'yearly', type: '',
+    dueDate: '04-01', yearMonth: 4, dotm: 1,
+    notes: 'Furnace filter, smoke alarms, HVAC, appliances.',
+  },
+  'home-safety': {
+    linkedTaskId: null, name: 'Home safety & security review',
+    emoji: '🔒', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'Locks, security setup, emergency plan, fire extinguisher.',
+  },
+  'home-insurance': {
+    linkedTaskId: null, name: 'Confirm home insurance renewal',
+    emoji: '🏠', freq: 'yearly', type: '',
+    dueDate: '06-12', yearMonth: 6, dotm: 12,
+    notes: 'Home insurance auto-renews Jun 12 with Belair/Johnson.',
+  },
+  'home-clean': {
+    linkedTaskId: null, name: 'Household tidy & organization',
+    emoji: '✨', freq: 'daily', type: '',
+    notes: 'Auto-detected from daily tidy task history.',
+  },
+  'home-exterior': {
+    linkedTaskId: null, name: 'Exterior & grounds maintenance',
+    emoji: '🌿', freq: 'weekly', type: '',
+    notes: 'Seasonal — shovelling in winter, lawn/garden in summer.',
+  },
+  'home-pets': {
+    linkedTaskId: null, name: 'Annual cat care review',
+    emoji: '🐱', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'Vet checkup, parasite prevention, supplies, daily care.',
+  },
+
+  // ── FINANCE ───────────────────────────────────────────────────────────────────
+  'fin-banking': {
+    linkedTaskId: null, name: 'RBC daily account screen',
+    emoji: '🏦', freq: 'daily', type: '',
+    notes: 'Auto-detected from daily RBC screen task history.',
+  },
+  'fin-budget': {
+    linkedTaskId: null, name: 'Monthly budget review',
+    emoji: '📊', freq: 'monthly', type: '',
+    dotm: 1,
+    notes: 'Monthly budget, spending check, groceries, master I/O.',
+  },
+  'fin-tax': {
+    linkedTaskId: null, name: 'File tax return',
+    emoji: '📄', freq: 'yearly', type: '',
+    dueDate: '04-30', yearMonth: 4, dotm: 30,
+    notes: 'Annual April 30 deadline. Federal and provincial.',
+  },
+  'fin-savings': {
+    linkedTaskId: null, name: 'Annual savings & investment review',
+    emoji: '💹', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'RESP, RRSP/TFSA, mortgage, investment alignment.',
+  },
+  'fin-insurance': {
+    linkedTaskId: null, name: 'Annual insurance & benefits review',
+    emoji: '🛡️', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'Blue Cross claims, coverage, beneficiaries, surveys.',
+  },
+  'fin-subscriptions': {
+    linkedTaskId: null, name: 'Subscriptions & costs audit',
+    emoji: '💳', freq: 'yearly', type: '',
+    dueDate: '07-01', yearMonth: 7, dotm: 1,
+    notes: 'Active subscriptions, rewards, phone plan, auto-pays.',
+  },
+
+  // ── FAMILY ────────────────────────────────────────────────────────────────────
+  'fam-identity': {
+    linkedTaskId: null, name: 'Family identity & documents review',
+    emoji: '🪪', freq: 'yearly', type: '',
+    dueDate: '07-01', yearMonth: 7, dotm: 1,
+    notes: 'Passports x3, health cards, vaccination records.',
+  },
+  'fam-health': {
+    linkedTaskId: null, name: 'Family health appointments review',
+    emoji: '🩺', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'Dental (Jackson, Katelyn), Wayne pediatric, general medical.',
+  },
+  'fam-legal': {
+    linkedTaskId: null, name: 'Legal & financial security review',
+    emoji: '⚖️', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'Will, life insurance, emergency fund, beneficiaries.',
+  },
+  'fam-schedules': {
+    linkedTaskId: null, name: 'Family calendar & schedule sync',
+    emoji: '📅', freq: 'weekly', type: '',
+    notes: 'Auto-detected from weekly family calendar tasks.',
+  },
+  'fam-emergency': {
+    linkedTaskId: null, name: 'Emergency preparedness review',
+    emoji: '🚨', freq: 'yearly', type: '',
+    dueDate: '01-01', yearMonth: 1, dotm: 1,
+    notes: 'Family plan, emergency contacts, medical info, supplies.',
+  },
+  'fam-connection': {
+    linkedTaskId: null, name: 'Monthly family connection check-in',
+    emoji: '❤️', freq: 'monthly', type: '',
+    dotm: 1,
+    notes: 'Family check-in, photos backed up, memories captured.',
   },
 };
 
@@ -5032,6 +5277,12 @@ async function _seedAndRender(el) {
       body: JSON.stringify({ action: 'seedVehicleCriteria' }) });
     await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action: 'seedDigitalCriteria' }) });
+    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'seedHomeCriteria' }) });
+    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'seedFinanceCriteria' }) });
+    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'seedFamilyCriteria' }) });
     {
       // Reload health criteria from sheet
       const res2  = await fetch(API_URL);
