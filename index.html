@@ -4149,80 +4149,63 @@ const DOMAIN_DEFS = [
 function evaluateCriterion(c) {
   const now     = new Date();
   const todayDk = dateKey(now);
+  const linked  = _criterionLinkedTask(c);
 
-  // Auto-detect from history
-  if (c.workflowType === 'auto-detect') {
-    const days   = parseInt(c.interval) || 7;
-    const cutoff = new Date(now);
-    cutoff.setDate(now.getDate() - days);
-    const found = rawHistory.some(e =>
-      e.taskId === c.id.replace('auto-', '') ||
-      (c.notes && e.name && e.name.toLowerCase().includes((c.notes||'').toLowerCase()))
-    );
-    return found ? 'green' : 'red';
-  }
-
-  // ── Core rule: amber = linked task is ACTIVE + INCOMPLETE on today's list ──
-  // This covers GET AHEAD tasks, OTOs due today, and recurring due today.
-  // Everything else is green (healthy / future) or red (genuinely overdue).
-  const linked = _criterionLinkedTask(c);
-  const linkedActiveIncomplete = linked && (() => {
+  // ── Check if linked task is active on today's list and incomplete ──────────
+  const activeToday = linked && (() => {
     const isDone = !!doneLog[linked.id + '_' + todayKey];
     if (isDone) return false;
-    // OTO targeted today
     if (linked.type === 'once' && linked.targetDate === todayDk) return true;
-    // GET AHEAD — within lead window and not done
     if (linked.dueDate) {
       const d = daysUntilDue(linked);
       return d !== null && d <= GET_AHEAD_LEAD_DAYS;
     }
-    // Recurring landing today
     return isDueOn(linked, new Date(todayDk + 'T00:00:00'));
   })();
 
-  if (linkedActiveIncomplete) return 'amber';
+  if (activeToday) return 'amber';
 
-  // ── Red: genuinely overdue — past due with no completion ──────────────────
+  // ── Red: genuinely overdue with no completion ─────────────────────────────
   if (c.nextDue && todayDk > c.nextDue) return 'red';
   if (c.lastCompleted) {
     const last       = new Date(c.lastCompleted + 'T00:00:00');
     const intervalMs = (parseInt(c.interval)||1) *
       (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
-    const nextDue    = new Date(last.getTime() + intervalMs);
-    if (now > nextDue) return 'red';
-    return 'green';
+    if (now > new Date(last.getTime() + intervalMs)) return 'red';
   }
 
-  // ── Recurring with no history — green if future occurrence exists ─────────
-  if (linked && linked.freq && linked.freq !== 'once') {
-    const next = _nextOccurrence(linked);
-    if (next) return 'green';
-  }
-
-  // ── Date-based with future nextDue — green ────────────────────────────────
-  if (c.nextDue) return 'green';
-
-  // Fallback
-  return c.status === 'green' ? 'green' : 'amber';
+  // ── Everything else is green: future OTO, future recurring, future nextDue ─
+  // "Pending/booked action item in the future" = healthy
+  return 'green';
 }
 
 // ── Next action text for a criterion ─────────────────────────────────────────
 function criterionNextAction(c) {
-  if (!c.nextDue && !c.lastCompleted) return null;
   const status = evaluateCriterion(c);
+
   if (c.nextDue) {
     const d   = new Date(c.nextDue + 'T00:00:00');
     const lbl = MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
     if (status === 'red')   return 'Overdue — ' + lbl;
-    if (status === 'amber') return 'Due soon — ' + lbl;
+    if (status === 'amber') return 'Action today — due ' + lbl;
     return 'Next due ' + lbl;
   }
   if (c.lastCompleted) {
     const last       = new Date(c.lastCompleted + 'T00:00:00');
-    const intervalMs = (parseInt(c.interval)||1) * (c.intervalUnit==='month' ? 30 : c.intervalUnit==='year' ? 365 : 7) * 864e5;
+    const intervalMs = (parseInt(c.interval)||1) *
+      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
     const nextDue    = new Date(last.getTime() + intervalMs);
-    const lbl = MONTHS[nextDue.getMonth()].slice(0,3) + ' ' + nextDue.getDate();
+    const lbl = MONTHS[nextDue.getMonth()].slice(0,3) + ' ' + nextDue.getDate() + ', ' + nextDue.getFullYear();
     return 'Next due ' + lbl;
+  }
+  // No nextDue or lastCompleted — try linked task
+  const linked = _criterionLinkedTask(c);
+  if (linked) {
+    if (linked.type === 'once' && linked.targetDate) {
+      return 'Scheduled ' + _fmtDate(linked.targetDate);
+    }
+    const next = _nextOccurrence(linked);
+    if (next) return 'Next ' + _fmtDate(next);
   }
   return null;
 }
@@ -4230,23 +4213,24 @@ function criterionNextAction(c) {
 // ── Domain overall health score + word ────────────────────────────────────────
 function domainHealth(domainKey) {
   const criteria = rawHealthCriteria.filter(c => c.domain === domainKey);
-  if (!criteria.length) return { pct: null, word: 'No criteria', color: 'amber', nextAction: null, nextDate: null };
+  if (!criteria.length) return { pct: null, word: 'No criteria', color: 'amber', nextAction: null, nextCriterion: null };
 
   const statuses = criteria.map(evaluateCriterion);
   const greens   = statuses.filter(s => s === 'green').length;
   const reds     = statuses.filter(s => s === 'red').length;
-  const pct      = Math.round(greens / criteria.length * 100);
+  // Score: only greens count. Amber = 0, Red = 0.
+  const pct = Math.round(greens / criteria.length * 100);
 
-  let color = 'green', word = 'Healthy';
-  if (reds > 0)       { color = 'red';   word = 'Needs attention'; }
-  else if (pct < 100) { color = 'amber'; word = 'In progress'; }
-  else                { color = 'green'; word = 'Completely healthy'; }
+  let color = 'green', word = 'Completely healthy';
+  if (pct === 100)     { color = 'green'; word = 'Completely healthy'; }
+  else if (pct >= 25)  { color = 'amber'; word = 'Action required'; }
+  else                 { color = 'red';   word = 'Needs attention'; }
 
-  // Next upcoming action across all criteria
+  // Next upcoming action — soonest criterion needing attention
   const upcoming = criteria
     .map(c => ({ c, action: criterionNextAction(c), status: evaluateCriterion(c) }))
-    .filter(x => x.action && x.status !== 'green' || (x.action && x.c.nextDue))
-    .sort((a,b) => {
+    .filter(x => x.action)
+    .sort((a, b) => {
       const ad = a.c.nextDue || a.c.lastCompleted || '9999';
       const bd = b.c.nextDue || b.c.lastCompleted || '9999';
       return ad.localeCompare(bd);
@@ -4254,10 +4238,11 @@ function domainHealth(domainKey) {
 
   return {
     pct, color, word,
-    nextAction: upcoming ? upcoming.action : null,
+    nextAction:    upcoming ? upcoming.action     : null,
     nextCriterion: upcoming ? upcoming.c.criterion : null,
   };
 }
+
 
 // ── Render domain modal for criterion action ──────────────────────────────────
 let _dmCriterion = null;
