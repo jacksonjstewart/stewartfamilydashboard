@@ -4691,8 +4691,13 @@ const CRITERION_TASKS = {
   'veh-registration': {
     linkedTaskId: null,
     name: 'Renew vehicle registration',
-    emoji: '📋', freq: 'yearly', type: '',
-    dueDate: '08-01', yearMonth: 8, dotm: 1,
+    emoji: '📋', freq: 'once', type: 'once', hardDeadline: true, validated: true,
+    getTargetDate: (c) => {
+      if (!c.nextDue) return dateKey(new Date());
+      const d = new Date(c.nextDue + 'T00:00:00');
+      d.setDate(d.getDate() - parseInt(c.warningDays || 60));
+      return dateKey(d);
+    },
     notes: 'Renew at any Alberta registry agent. Bring current registration and insurance.',
   },
   'veh-insurance': {
@@ -5091,26 +5096,26 @@ async function checkAndGenerateOTOs() {
       t.name === canonicalName || t.name === '[HEALTH] ' + c.criterion
     );
 
-    // For OTO criteria: if task exists but targetDate is wrong, update it
+    // For OTO criteria: if task exists but is wrong type or wrong targetDate, replace it
     if (existing && def.type === 'once' && def.getTargetDate) {
       const correctTarget = def.getTargetDate(c);
-      if (existing.targetDate !== correctTarget && correctTarget) {
+      const wrongType   = existing.type !== 'once';
+      const wrongTarget = existing.targetDate !== correctTarget;
+      if ((wrongType || wrongTarget) && correctTarget) {
         try {
-          // Delete old, will be recreated below with correct targetDate
           await fetch(API_URL, {
             method: 'POST', headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'deleteTask', taskId: existing.id })
           });
-          // Remove from allTasks so creation proceeds below
           const idx = allTasks.indexOf(existing);
           if (idx >= 0) allTasks.splice(idx, 1);
-          console.log('[DOMAINS] Updating OTO targetDate for:', canonicalName, '->', correctTarget);
-        } catch(e) { continue; } // if delete fails, skip to avoid duplicate
+          console.log('[DOMAINS] Replacing task for:', canonicalName, '-> OTO', correctTarget);
+        } catch(e) { continue; }
       } else {
-        continue; // task exists with correct targetDate
+        continue; // task exists and is correct
       }
     } else if (existing) {
-      continue; // non-OTO task already exists
+      continue; // non-OTO task already exists — leave it
     }
 
     const sectionMap = { vehicle: 'vehicle', home: 'home', finance: 'finance', family: 'family' };
@@ -5302,6 +5307,11 @@ function _openDateShiftModal(c, linked) {
 
   const btn = document.getElementById('dm-confirm');
   btn.textContent = 'CONFIRM COMPLETE';
+  // Green button for renewal criteria — hard deadlines with date entry
+  if (isRenewal) {
+    btn.style.color       = '#4ade80';
+    btn.style.borderColor = '#4ade80';
+  }
   btn.onclick = async () => {
     const completedDate = document.getElementById('dm-completed-date')?.value || todayKey;
     const nextDueEl     = document.getElementById('dm-next-due');
