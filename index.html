@@ -2623,6 +2623,11 @@ function parseCSV(text) {
       if (!t.id && t.type === 'once') {
         t.id = 'tmp_' + btoa(unescape(encodeURIComponent(t.name + t.section))).slice(0,12);
       }
+      // Derive hardDeadline from CRITERION_TASKS definition — no sheet column needed
+      if (t.type === 'once' && typeof CRITERION_TASKS !== 'undefined') {
+        const ctDef = Object.values(CRITERION_TASKS).find(d => d.name === t.name);
+        if (ctDef && ctDef.hardDeadline) t.hardDeadline = true;
+      }
       return t;
     });
 }
