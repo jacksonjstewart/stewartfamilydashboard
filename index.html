@@ -4631,8 +4631,10 @@ function _criterionCanonicalName(c) {
 function _criterionLinkedTask(c) {
   const name     = _criterionCanonicalName(c);
   const allTasks = [...sheetTasks, ...customTasks];
-  // Match by name (exact) — works for both OTO and recurring
-  return allTasks.find(t => t.name === name) || null;
+  // Match by new canonical name first, then fall back to old [HEALTH] tag
+  return allTasks.find(t => t.name === name)
+      || allTasks.find(t => t.name === '[HEALTH] ' + c.criterion)
+      || null;
 }
 
 async function checkAndGenerateOTOs() {
@@ -4645,8 +4647,10 @@ async function checkAndGenerateOTOs() {
     if (!def) continue; // no task definition for this criterion yet
 
     const canonicalName = def.name;
-    // Check if task already exists (any type — OTO or recurring)
-    const exists = allTasks.some(t => t.name === canonicalName);
+    // Don't create if new canonical name OR old [HEALTH] name already exists
+    const exists = allTasks.some(t =>
+      t.name === canonicalName || t.name === '[HEALTH] ' + c.criterion
+    );
     if (exists) continue;
 
     const sectionMap = { vehicle: 'vehicle', home: 'home', finance: 'finance', family: 'family' };
@@ -4688,10 +4692,9 @@ async function checkAndGenerateOTOs() {
     }
   }
 
-  if (generated > 0) {
-    await syncFromSheet();
-    if (currentView === 'domains') renderDomains();
-  }
+  // Always sync so linked task display is current
+  await syncFromSheet();
+  if (currentView === 'domains') renderDomains();
 }
 
 
