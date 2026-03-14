@@ -3268,7 +3268,8 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
               ? rawHealthCriteria.find(c => c.id === critId) : null;
             const domainLabel = critId.split('-')[0].toUpperCase();
             const critName    = crit ? crit.criterion : critId;
-            return `<div class="task-health-stamp">${task.id} · ${domainLabel}: ${critName}</div>`;
+            const seal        = def.validated ? ' ✓' : '';
+            return `<div class="task-health-stamp">${task.id} · ${domainLabel}: ${critName}${seal}</div>`;
           }
         }
       }
@@ -4583,9 +4584,12 @@ function _renderDomainsInner(el) {
         const dotColor = status; // dot always mirrors criterion status
         row.className = `criterion-row ${status}`;
         row.dataset.id = c.id;
+        const ctDef    = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
+        const valSeal  = ctDef && ctDef.validated
+          ? ' <span style="color:#4ade80;font-size:10px;letter-spacing:0">✓</span>' : '';
         row.innerHTML = `
           <div class="criterion-dot ${dotColor}"></div>
-          <div class="criterion-name">${c.criterion}</div>
+          <div class="criterion-name">${c.criterion}${valSeal}</div>
           <div class="criterion-meta">${nextAct || ''}</div>
           <div class="criterion-chevron">▶</div>`;
 
@@ -4677,7 +4681,7 @@ const CRITERION_TASKS = {
   'veh-license': {
     linkedTaskId: 'v08',
     name: "Renew driver's licence",
-    emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true,
+    emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true, validated: true,
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
       const d = new Date(c.nextDue + 'T00:00:00');
