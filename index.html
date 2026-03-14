@@ -3325,12 +3325,10 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
       if (e.target.closest('.task-remove')) return;
 
       // OTO linked to a health criterion that needs date entry — intercept and open date modal
-      console.log('[STEWARD] row click — task.type:', task.type, 'task.id:', task.id, 'task.name:', task.name);
       const _isOTO = task.type === 'once' || task.freq === 'once' || task.targetDate;
       if (_isOTO && !doneLog[task.id + '_' + todayKey]
           && typeof rawHealthCriteria !== 'undefined'
           && typeof CRITERION_TASKS !== 'undefined') {
-        console.log('[STEWARD] OTO intercept check — rawHealthCriteria.length:', rawHealthCriteria.length);
         let crit = null;
         for (const c of rawHealthCriteria) {
           const def = CRITERION_TASKS[c.id];
@@ -3338,16 +3336,12 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
           // Match by linkedTaskId (most reliable) or case-insensitive name
           const nameMatch = def.name && task.name &&
             def.name.toLowerCase().replace(/['']/g,"'") === task.name.toLowerCase().replace(/['']/g,"'");
-          console.log('[STEWARD] checking criterion:', c.id, 'def.linkedTaskId:', def.linkedTaskId, 'nameMatch:', nameMatch);
           if (def.linkedTaskId === task.id || nameMatch) { crit = c; break; }
         }
-        console.log('[STEWARD] crit found:', crit ? crit.id : 'null');
         if (crit) {
           const def = CRITERION_TASKS[crit.id];
           const wt  = (def && def.workflowType) || crit.workflowType || '';
-          console.log('[STEWARD] workflowType:', wt);
           if (wt === 'simple-date' || wt === 'auto-renew-date') {
-            console.log('[STEWARD] opening date shift modal');
             _openDateShiftModal(crit, task); return;
           }
         }
@@ -4679,7 +4673,6 @@ function _renderDomainsInner(el) {
         // Wire the action button — must be after detail is appended to DOM
         detail.querySelector('.criterion-action-btn').addEventListener('click', (e) => {
           e.stopPropagation();
-          console.log('[STEWARD] domain action btn clicked — criterionId:', c.id);
           _criterionAction(c.id);
         });
 
@@ -5119,7 +5112,9 @@ function _nextOccurrence(task) {
 
 
 async function checkAndGenerateOTOs() {
-  if (!rawHealthCriteria.length) return;
+  if (checkAndGenerateOTOs._running) return;
+  checkAndGenerateOTOs._running = true;
+  if (!rawHealthCriteria.length) { checkAndGenerateOTOs._running = false; return; }
   const allTasks = [...sheetTasks, ...customTasks];
   let generated  = 0;
 
@@ -5144,8 +5139,6 @@ async function checkAndGenerateOTOs() {
             method: 'POST', headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'deleteTask', taskId: existing.id })
           });
-          // Sync immediately so the deleted task is gone before we recreate
-          await syncFromSheet();
           const idx = allTasks.indexOf(existing);
           if (idx >= 0) allTasks.splice(idx, 1);
           console.log('[DOMAINS] Replacing task for:', canonicalName, '-> OTO', correctTarget);
@@ -5211,6 +5204,7 @@ async function checkAndGenerateOTOs() {
     if (d.patched > 0) { console.log('[DOMAINS] Repaired', d.patched, 'biweekly anchor(s)'); syncFromSheet(); }
   }).catch(() => {});
   if (currentView === 'domains') renderDomains();
+  checkAndGenerateOTOs._running = false;
 }
 
 
@@ -5313,10 +5307,8 @@ function _openSubCheckModal(c, linked) {
 
 // Modal for date-sensitive completions — asks for new expiry/next-due date
 function _openDateShiftModal(c, linked) {
-  console.log('[STEWARD] _openDateShiftModal called — c.id:', c.id, 'linked:', linked ? linked.id : 'null');
   const isRenewal = ['veh-license','veh-registration','veh-insurance'].includes(c.id);
   const overlay = document.getElementById('domain-modal-overlay');
-  console.log('[STEWARD] overlay element:', overlay, 'classList:', overlay ? overlay.className : 'NULL');
   document.getElementById('dm-title').textContent    = c.domain.toUpperCase() + ' · ' + c.category.toUpperCase();
   document.getElementById('dm-subtitle').textContent = c.criterion;
 
