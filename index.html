@@ -4188,6 +4188,13 @@ function evaluateCriterion(c) {
     return 'green';
   }
 
+  // No lastCompleted — check if linked task gives us a future occurrence
+  // If there's a linked recurring task with a known future date → healthy (green)
+  const linked = _criterionLinkedTask(c);
+  if (linked && linked.freq && linked.freq !== 'once') {
+    const next = _nextOccurrence(linked);
+    if (next) return 'green'; // future occurrence exists — healthy
+  }
   // No data yet — never completed
   return c.status || 'amber';
 }
@@ -4493,10 +4500,20 @@ function renderDomains() {
         const nextAct = criterionNextAction(c);
 
         const row = document.createElement('div');
+        // Dot color: green always unless linked task is active+incomplete today
+        const _lt = _criterionLinkedTask(c);
+        const _ltActiveToday = _lt && (() => {
+          const isDone = !!doneLog[_lt.id + '_' + todayKey];
+          if (isDone) return false;
+          if (_lt.type === 'once' && _lt.targetDate === todayKey) return true;
+          if (_lt.dueDate) { const d = daysUntilDue(_lt); return d !== null && d <= GET_AHEAD_LEAD_DAYS; }
+          return isDueOn(_lt, new Date(todayKey + 'T00:00:00'));
+        })();
+        const dotColor = _ltActiveToday ? 'amber' : 'green';
         row.className = `criterion-row ${status}`;
         row.dataset.id = c.id;
         row.innerHTML = `
-          <div class="criterion-dot ${status}"></div>
+          <div class="criterion-dot ${dotColor}"></div>
           <div class="criterion-name">${c.criterion}</div>
           <div class="criterion-meta">${nextAct || ''}</div>
           <div class="criterion-chevron">▶</div>`;
@@ -4543,8 +4560,8 @@ function renderDomains() {
           <div class="criterion-detail-status">${statusLine}</div>
           ${linkedHTML}
           ${c.instructions ? `<div class="criterion-instructions">${c.instructions}</div>` : ''}
-          <button class="criterion-action-btn ${status === 'green' ? '' : 'primary'}"
-            onclick="openDomainModal('${c.id}')">${actionLabel}</button>`;
+          <button class="criterion-action-btn ${_ltActiveToday ? 'primary' : ''}"
+            onclick="_criterionAction('${c.id}')">${actionLabel}</button>`;
 
         row.addEventListener('click', () => {
           const isOpen = detail.classList.contains('open');
@@ -4782,6 +4799,125 @@ async function checkAndGenerateOTOs() {
   if (currentView === 'domains') renderDomains();
 }
 
+
+
+// ─── CRITERION ACTION BUTTON ──────────────────────────────────────────────────
+// Smart handler for the action button in each criterion detail dropdown.
+// Routes to the correct flow based on workflow type and linked task.
+
+async function _criterionAction(criterionId) {
+  const c    = rawHealthCriteria.find(r => r.id === criterionId);
+  if (!c) return;
+  const linked = _criterionLinkedTask(c);
+
+  // ── Recurring task (e.g. car interior) ───────────────────────────────────
+  // Mark the linked task done for today via the existing toggle system
+  if (linked && linked.type !== 'once' && linked.freq !== 'once') {
+    const key    = linked.id + '_' + todayKey;
+    const isDone = !!doneLog[key];
+    if (!isDone) {
+      // Mark done — same pathway as tapping the task row
+      const ts = new Date().toISOString();
+      doneLog[key] = { ts, who: currentIdentity };
+      _localOrigin.add(key);
+      saveDone(doneLog);
+      renderInPlace();
+      writeCheckToSheet(linked.id, ts);
+      // Update lastCompleted in HealthCriteria so criterion goes green
+      const updated = { ...c, lastCompleted: todayKey };
+      await _saveAndRefresh(updated);
+    } else {
+      // Already done today — just refresh domains display
+      renderDomains();
+    }
+    return;
+  }
+
+  // ── Date-sensitive OTO (licence, registration, insurance, oil, tires) ────
+  // Need new expiry/completion date → modal
+  if (linked && (linked.type === 'once' || linked.freq === 'once') || c.workflowType !== 'recurring-modal') {
+    _openDateShiftModal(c, linked);
+    return;
+  }
+
+  // ── Fallback: open standard domain modal ─────────────────────────────────
+  openDomainModal(criterionId);
+}
+
+// Modal for date-sensitive completions — asks for new expiry/next-due date
+function _openDateShiftModal(c, linked) {
+  const isRenewal = ['veh-license','veh-registration','veh-insurance'].includes(c.id);
+  const overlay = document.getElementById('domain-modal-overlay');
+  document.getElementById('dm-title').textContent    = c.domain.toUpperCase() + ' · ' + c.category.toUpperCase();
+  document.getElementById('dm-subtitle').textContent = c.criterion;
+
+  const body = document.getElementById('dm-body');
+  body.innerHTML = '';
+
+  // Completion date
+  const f1 = document.createElement('div');
+  f1.className = 'dm-field';
+  f1.innerHTML = `<div class="dm-field-label">DATE COMPLETED</div>
+    <input type="date" class="dm-date-input" id="dm-completed-date" value="${todayKey}" />`;
+  body.appendChild(f1);
+
+  // New expiry / next due (for renewals)
+  if (isRenewal) {
+    const f2 = document.createElement('div');
+    f2.className = 'dm-field';
+    const hint = c.id === 'veh-license'     ? 'New licence expiry date'
+               : c.id === 'veh-registration' ? 'New registration expiry date'
+               : 'Next renewal date';
+    f2.innerHTML = `<div class="dm-field-label">${hint.toUpperCase()}</div>
+      <input type="date" class="dm-date-input" id="dm-next-due" value="${c.nextDue||''}" />
+      <div class="criterion-instructions" style="margin-top:6px">
+        Completing early? Enter the actual new expiry/renewal date — the app will
+        reschedule the next reminder from this date, not the original due date.
+      </div>`;
+    body.appendChild(f2);
+  }
+
+  const btn = document.getElementById('dm-confirm');
+  btn.textContent = 'CONFIRM COMPLETE';
+  btn.onclick = async () => {
+    const completedDate = document.getElementById('dm-completed-date')?.value || todayKey;
+    const nextDueEl     = document.getElementById('dm-next-due');
+    const newNextDue    = nextDueEl ? nextDueEl.value : c.nextDue;
+
+    // Update HealthCriteria
+    const updated = { ...c, lastCompleted: completedDate, nextDue: newNextDue || c.nextDue, bookedDate: '' };
+    await _saveAndRefresh(updated);
+
+    // Mark linked OTO done for today and retire it from DESIGN
+    if (linked && (linked.type === 'once' || linked.freq === 'once')) {
+      const key = linked.id + '_' + todayKey;
+      if (!doneLog[key]) {
+        const ts = new Date().toISOString();
+        doneLog[key] = { ts, who: currentIdentity };
+        _localOrigin.add(key);
+        saveDone(doneLog);
+        writeCheckToSheet(linked.id, ts);
+      }
+      // Delete the old OTO from DESIGN — it's been completed
+      try {
+        await fetch(API_URL, {
+          method: 'POST', headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'deleteTask', taskId: linked.id })
+        });
+        // Sync sheet so the deleted task disappears
+        await syncFromSheet();
+      } catch(e) { console.warn('deleteTask failed:', e); }
+    }
+
+    // Regenerate a new future OTO for this criterion at the correct future date
+    // (checkAndGenerateOTOs will handle this on next load since old task is gone)
+    closeDomainModal();
+    renderDomains();
+  };
+
+  overlay.classList.add('open');
+  document.getElementById('domain-modal').scrollTop = 0;
+}
 
 async function _seedAndRender(el) {
   el.innerHTML = '<div class="domains-empty">Setting up health criteria…</div>';
