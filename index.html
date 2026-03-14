@@ -4524,8 +4524,9 @@ function _renderDomainsInner(el) {
 
     // Header
     const pctText = health.pct !== null ? health.pct + '%' : '—';
+    const nextSpanColor = health.color === 'green' ? '#4ade80' : '#facc15';
     const nextHTML = health.nextAction
-      ? `Next: <span>${health.nextCriterion}</span> · ${health.nextAction}`
+      ? `Next: <span style="color:${nextSpanColor}">${health.nextCriterion}</span> · ${health.nextAction}`
       : 'All indicators healthy';
 
     card.innerHTML = `
