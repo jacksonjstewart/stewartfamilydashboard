@@ -2425,11 +2425,18 @@ function daysUntilDue(task) {
 }
 
 function isGetAheadTask(task) {
-  // A get-ahead task is: has dueDate, not type=once, within lead window, not done today
-  if (!task.dueDate || task.type === 'once') return false;
+  if (!task.dueDate) return false;
+  // GET-AHEAD OTO: has targetDate + dueDate — in GET AHEAD until dueDate arrives
+  if (task.type === 'once' || task.freq === 'once') {
+    if (!task.targetDate) return false;
+    // Only GET AHEAD between targetDate and dueDate
+    // On/after dueDate it belongs in ONE TIME ONLY
+    const days = daysUntilDue(task);
+    return days !== null && days > 0 && todayKey >= task.targetDate;
+  }
+  // Recurring GET AHEAD: within lead window
   var days = daysUntilDue(task);
   if (days === null) return false;
-  // Surface within GET_AHEAD_LEAD_DAYS window, or if overdue (days < 0) — still actionable
   return days <= GET_AHEAD_LEAD_DAYS;
 }
 
@@ -2447,19 +2454,21 @@ function getAheadLabel(task) {
 function isDueToday(task, d) {
   if (task.type === 'once') {
     const dk  = dateKey(d);
-    // Always show a completed OTO task — it must remain visible after checking
+    // Always show a completed OTO task
     if (doneLog[task.id + '_' + dk]) return true;
 
     if (!task.targetDate) return true; // no target date — show daily until done
 
-    // Push-forward overrides — show if in pushForwardList
+    // Push-forward overrides
     if (pushForwardList.includes(task.id)) return true;
 
-    // Show on target date
-    if (task.targetDate === dk) return true;
+    // GET-AHEAD OTO: has both targetDate and dueDate
+    // Surface from targetDate onward — GET AHEAD section until dueDate, ONE TIME ONLY after
+    if (task.dueDate && dk >= task.targetDate) return true;
 
-    // Grace day — show the day after target if not completed
-    const target = new Date(task.targetDate + "T00:00:00");
+    // Standard OTO: show on targetDate and grace day only
+    if (task.targetDate === dk) return true;
+    const target = new Date(task.targetDate + 'T00:00:00');
     const grace  = addDays(target, 1);
     if (dateKey(grace) === dk) return true;
 
@@ -3386,7 +3395,7 @@ function renderInPlace() {
   const allTasks      = [...sheetTasks, ...customTasks];
   const todayTasks    = allTasks.filter(t => isDueToday(t, today));
   // getAheadOnly = tasks surfaced purely by the get-ahead window, not genuinely due today
-  const getAheadOnly  = todayTasks.filter(t => t.type !== 'once' && t.dueDate && isGetAheadTask(t) && !isDueOn(t, today));
+  const getAheadOnly  = todayTasks.filter(t => t.dueDate && isGetAheadTask(t) && !(t.type !== 'once' && isDueOn(t, today)));
   // coreTasks = everything the user is expected to complete today (excludes bonus get-ahead)
   const getAheadIds   = new Set(getAheadOnly.map(t => t.id));
   const coreTasks     = todayTasks.filter(t => !getAheadIds.has(t.id));
@@ -3443,7 +3452,7 @@ function render() {
   const allTasks      = [...sheetTasks, ...customTasks];
   const todayTasks    = allTasks.filter(t => isDueToday(t, today));
   // getAheadOnly = tasks surfaced purely by get-ahead window, not genuinely due today
-  const getAheadOnly  = todayTasks.filter(t => t.type !== 'once' && t.dueDate && isGetAheadTask(t) && !isDueOn(t, today));
+  const getAheadOnly  = todayTasks.filter(t => t.dueDate && isGetAheadTask(t) && !(t.type !== 'once' && isDueOn(t, today)));
   // coreTasks = everything expected today (OTO + recurring + push-forward), excludes bonus get-ahead
   const getAheadIds   = new Set(getAheadOnly.map(t => t.id));
   const coreTasks     = todayTasks.filter(t => !getAheadIds.has(t.id));
@@ -3463,7 +3472,10 @@ function render() {
     emptyEl.style.display = "none";
 
     // ── 1. ONE TIME ONLY — always above recurring; incomplete first, complete last ──
-    const allOnceTasks = todayTasks.filter(t => t.type === 'once');
+    // OTO tasks in GET AHEAD window (have dueDate, before dueDate) go to GET AHEAD not ONE TIME ONLY
+    const allOnceTasks = todayTasks.filter(t =>
+      (t.type === 'once' || t.freq === 'once') && !isGetAheadTask(t)
+    );
     if (allOnceTasks.length > 0) {
       const allOnceDone = allOnceTasks.every(t => !!doneLog[t.id + "_" + todayKey]);
       const oHdr = document.createElement("div");
@@ -4721,6 +4733,7 @@ const CRITERION_TASKS = {
       ) - parseInt(c.warningDays || 60) * 864e5;
       return dateKey(new Date(ms));
     },
+    getDueDate: (c) => c.nextDue ? c.nextDue.slice(5) : null, // MM-DD from nextDue
     notes: 'Go to any Alberta registry agent. Bring current licence and payment. No appointment needed.',
   },
   'veh-registration': {
@@ -4738,6 +4751,7 @@ const CRITERION_TASKS = {
       ) - parseInt(c.warningDays || 60) * 864e5;
       return dateKey(new Date(ms));
     },
+    getDueDate: (c) => c.nextDue ? c.nextDue.slice(5) : null, // MM-DD from nextDue
     notes: 'Renew at any Alberta registry agent. Bring current registration and insurance.',
   },
   'veh-insurance': {
@@ -5154,7 +5168,8 @@ async function checkAndGenerateOTOs() {
             await fetch(API_URL, {
               method: 'POST', headers: { 'Content-Type': 'text/plain' },
               body: JSON.stringify({ action: 'updateTask', taskId: existing.id,
-                fields: { targetdate: correctTarget, type: 'once', frequency: 'once' } })
+                fields: { targetdate: correctTarget, type: 'once', frequency: 'once',
+                          duedate: def.getDueDate ? def.getDueDate(c) : '' } })
             });
             // Update local copy
             existing.targetDate = correctTarget;
@@ -5186,7 +5201,8 @@ async function checkAndGenerateOTOs() {
 
     // OTO gets a targetDate; yearly recurring gets dueDate+yearMonth+dotm; biweekly gets anchorDate
     if (def.type === 'once') {
-      task.targetDate   = def.getTargetDate(c);
+      task.targetDate = def.getTargetDate(c);
+      if (def.getDueDate) task.dueDate = def.getDueDate(c); // MM-DD for countdown badge
       if (def.hardDeadline) task.hardDeadline = true;
     } else if (def.freq === 'yearly') {
       task.dueDate   = def.dueDate;    // MM-DD — isGetAheadTask reads this
@@ -5396,10 +5412,13 @@ function _openDateShiftModal(c, linked) {
           : null;
         if (newTargetDate) {
           try {
+            const newDueDate = def && def.getDueDate
+              ? def.getDueDate({ ...c, nextDue: newNextDue }) : null;
             await fetch(API_URL, {
               method: 'POST', headers: { 'Content-Type': 'text/plain' },
               body: JSON.stringify({ action: 'updateTask', taskId: linked.id,
-                fields: { targetdate: newTargetDate } })
+                  fields: { targetdate: newTargetDate,
+                            ...(newDueDate ? { duedate: newDueDate } : {}) } })
             });
             // Update local sheetTasks so UI reflects new date immediately
             const lt = sheetTasks.find(t => t.id === linked.id);
