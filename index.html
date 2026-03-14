@@ -1498,6 +1498,259 @@
   #wr-noted:hover  { border-color: #3a3a3a; color: rgba(255,255,255,0.5); }
   #wr-noted:active { transform: scale(0.97); }
 
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     DOMAINS TAB
+  ═══════════════════════════════════════════════════════════════════════════ */
+
+  #domains-content { display: flex; flex-direction: column; gap: 28px; padding-bottom: 40px; }
+
+  /* Domain card */
+  .domain-card {
+    background: #0c0c0c; border: 1px solid #1a1a1a;
+    border-radius: 16px; overflow: hidden;
+  }
+
+  /* Domain card header */
+  .domain-card-header {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid #111;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .domain-card-header:hover { background: rgba(255,255,255,0.01); }
+
+  .domain-header-top {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 6px;
+  }
+  .domain-status-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    animation: domainPulse 2.8s ease-in-out infinite;
+  }
+  .domain-status-dot.green  { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.4); }
+  .domain-status-dot.amber  { background: #facc15; box-shadow: 0 0 6px rgba(250,204,21,0.4); }
+  .domain-status-dot.red    { background: #f87171; box-shadow: 0 0 6px rgba(248,113,113,0.4); }
+
+  @keyframes domainPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.55; transform: scale(0.85); }
+  }
+
+  .domain-name {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: 3px;
+    color: #e8e8e8; flex: 1;
+  }
+  .domain-score {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 300; color: #e8e8e8;
+    letter-spacing: -0.5px; line-height: 1;
+  }
+  .domain-score.green { color: #4ade80; }
+  .domain-score.amber { color: #facc15; }
+  .domain-score.red   { color: #f87171; }
+
+  .domain-header-meta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding-left: 20px;
+  }
+  .domain-status-word {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.3);
+  }
+  .domain-next-action {
+    font-family: 'Outfit', sans-serif;
+    font-size: 8px; font-weight: 600; letter-spacing: 1.5px;
+    color: #333; text-align: right; max-width: 55%;
+    line-height: 1.4;
+  }
+  .domain-next-action span { color: #facc15; }
+
+  /* Criteria list */
+  .domain-criteria { padding: 4px 0 8px; }
+
+  .criterion-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 22px; cursor: pointer;
+    border-bottom: 1px solid #0d0d0d;
+    transition: background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .criterion-row:last-child { border-bottom: none; }
+  .criterion-row:hover { background: rgba(255,255,255,0.015); }
+
+  .criterion-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    animation: domainPulse 2.8s ease-in-out infinite;
+  }
+  .criterion-dot.green { background: #4ade80; box-shadow: 0 0 4px rgba(74,222,128,0.35); }
+  .criterion-dot.amber { background: #facc15; box-shadow: 0 0 4px rgba(250,204,21,0.35); }
+  .criterion-dot.red   { background: #f87171; box-shadow: 0 0 4px rgba(248,113,113,0.35); }
+
+  .criterion-name {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px; font-weight: 500; color: #888;
+    flex: 1; letter-spacing: 0.2px;
+  }
+  .criterion-row.green .criterion-name { color: #888; }
+  .criterion-row.amber .criterion-name { color: #c8a800; }
+  .criterion-row.red   .criterion-name { color: #d96060; }
+
+  .criterion-meta {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 12px; font-weight: 300; font-style: italic;
+    color: #333; text-align: right; line-height: 1.3;
+  }
+  .criterion-chevron {
+    font-size: 9px; color: #2a2a2a; margin-left: 4px; flex-shrink: 0;
+    transition: transform 0.2s;
+  }
+  .criterion-row.expanded .criterion-chevron { transform: rotate(90deg); }
+
+  /* Criterion expanded detail */
+  .criterion-detail {
+    background: #080808; border-top: 1px solid #0d0d0d;
+    padding: 14px 22px 16px 40px;
+    display: none;
+  }
+  .criterion-detail.open { display: block; }
+
+  .criterion-detail-status {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.3); margin-bottom: 10px;
+  }
+  .criterion-action-btn {
+    background: none; border: 1px solid #222; border-radius: 6px;
+    cursor: pointer; font-family: 'Outfit', sans-serif;
+    font-size: 8px; font-weight: 700; letter-spacing: 3px;
+    color: rgba(255,255,255,0.3); padding: 8px 16px;
+    transition: all 0.2s; margin-top: 8px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .criterion-action-btn:hover { border-color: #444; color: rgba(255,255,255,0.6); }
+  .criterion-action-btn.primary { border-color: #2a3a2a; color: #4ade80; }
+  .criterion-action-btn.primary:hover { border-color: #4ade80; background: rgba(74,222,128,0.05); }
+  .criterion-instructions {
+    font-family: 'Outfit', sans-serif;
+    font-size: 10px; color: #333; letter-spacing: 0.3px;
+    line-height: 1.6; margin-top: 10px;
+  }
+
+  /* Category group label */
+  .criterion-category-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 8px; font-weight: 700; letter-spacing: 2.5px;
+    color: #222; padding: 10px 22px 4px;
+  }
+
+  /* Domain health modal */
+  #domain-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75); z-index: 200;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    align-items: flex-end; justify-content: center;
+  }
+  #domain-modal-overlay.open { display: flex; }
+  #domain-modal {
+    background: #111; border: 1px solid #1e1e1e;
+    border-radius: 20px 20px 0 0; width: 100%; max-width: 700px;
+    padding: 28px 28px 40px; max-height: 85vh; overflow-y: auto;
+    animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
+    position: relative; overflow: hidden;
+  }
+  #domain-modal::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+  #domain-modal > * { position: relative; z-index: 1; }
+  #dm-header { margin-bottom: 20px; }
+  #dm-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 10px; font-weight: 700; letter-spacing: 3px;
+    color: rgba(255,255,255,0.4); margin-bottom: 6px;
+  }
+  #dm-subtitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px; font-weight: 300;
+    color: #e8e8e8; letter-spacing: -0.3px;
+  }
+  #dm-body { margin-bottom: 24px; }
+  .dm-field { margin-bottom: 18px; }
+  .dm-field-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px; font-weight: 600; letter-spacing: 2px;
+    color: #444; margin-bottom: 8px;
+  }
+  .dm-date-input {
+    background: #0c0c0c; border: 1px solid #252525;
+    border-radius: 8px; padding: 10px 14px;
+    font-family: 'Outfit', sans-serif; font-size: 13px;
+    color: #e8e8e8; width: 100%; box-sizing: border-box;
+    outline: none; transition: border-color 0.2s;
+  }
+  .dm-date-input:focus { border-color: #444; }
+  .dm-checklist { display: flex; flex-direction: column; gap: 2px; }
+  .dm-check-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 8px;
+    background: #0c0c0c; border: 1px solid #141414;
+    cursor: pointer; transition: border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dm-check-row:hover { border-color: #222; }
+  .dm-check-row.checked { border-color: rgba(74,222,128,0.2); background: rgba(74,222,128,0.03); }
+  .dm-check-box {
+    width: 18px; height: 18px; border-radius: 5px;
+    border: 1px solid #2a2a2a; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .dm-check-row.checked .dm-check-box {
+    background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.4);
+  }
+  .dm-check-tick { color: #4ade80; font-size: 10px; display: none; }
+  .dm-check-row.checked .dm-check-tick { display: block; }
+  .dm-check-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px; font-weight: 500; color: #888; flex: 1;
+  }
+  .dm-check-help {
+    font-size: 9px; color: #333; letter-spacing: 0; line-height: 1.5;
+    margin-top: 4px; padding: 0 12px 8px 42px; display: none;
+  }
+  .dm-check-row.expanded + .dm-check-help { display: block; }
+  #dm-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 16px; border-top: 1px solid #1a1a1a;
+  }
+  #dm-cancel {
+    background: none; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 9px;
+    font-weight: 600; letter-spacing: 2px; color: #333;
+    padding: 8px 0; transition: color 0.2s;
+  }
+  #dm-cancel:hover { color: #555; }
+  #dm-confirm {
+    background: none; border: 1px solid #252525;
+    border-radius: 6px; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 9px;
+    font-weight: 700; letter-spacing: 4px; color: rgba(255,255,255,0.4);
+    padding: 10px 24px; transition: all 0.2s;
+  }
+  #dm-confirm:hover { border-color: #4ade80; color: #4ade80; }
+  #dm-confirm:active { transform: scale(0.97); }
+
+  /* Domains empty state */
+  .domains-empty {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px; font-style: italic; color: #2a2a2a;
+    text-align: center; padding: 40px 0;
+  }
+
+
 </style>
 </head>
 <body>
@@ -1563,6 +1816,21 @@
   </div>
 </div>
 
+<!-- DOMAIN HEALTH MODAL -->
+<div id="domain-modal-overlay" style="display:none" onclick="closeDomainModal()">
+  <div id="domain-modal" onclick="event.stopPropagation()">
+    <div id="dm-header">
+      <div id="dm-title"></div>
+      <div id="dm-subtitle"></div>
+    </div>
+    <div id="dm-body"></div>
+    <div id="dm-footer">
+      <button id="dm-cancel" onclick="closeDomainModal()">CANCEL</button>
+      <button id="dm-confirm">CONFIRM</button>
+    </div>
+  </div>
+</div>
+
 <div id="offline-banner">⚠ NO CONNECTION — changes will not be saved until you're back online</div>
 <div id="top-bar"><div id="top-bar-fill"></div></div>
 <div id="app">
@@ -1600,6 +1868,7 @@
     <div id="nav">
       <button class="nav-btn active" onclick="switchView('today')">TODAY</button>
       <button class="nav-btn" onclick="switchView('week')">WEEK AHEAD</button>
+      <button class="nav-btn" onclick="switchView('domains')">DOMAINS</button>
       <button class="nav-btn" onclick="switchView('history')">HISTORY</button>
     </div>
 
@@ -1809,7 +2078,12 @@
       </div>
       <div id="history-content"></div>
     </div>
-  <div id="left-footer">
+  <!-- DOMAINS VIEW -->
+    <div id="view-domains" style="display:none">
+      <div id="domains-content"></div>
+    </div>
+
+    <div id="left-footer">
     <div id="checkin-indicator"></div>
     <div id="version-tag">STEWARD · v1.0</div>
   </div>
@@ -2300,12 +2574,13 @@ async function fetchHistory() {
     });
     rawHistory      = entries;
     rawOTOEvents   = otoEvents;
-    rawWeeklyReports = Array.isArray(data.weeklyReports) ? data.weeklyReports : [];
-    try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory, oto: rawOTOEvents, wr: rawWeeklyReports })); } catch(e) {}
+    rawWeeklyReports  = Array.isArray(data.weeklyReports)  ? data.weeklyReports  : [];
+    rawHealthCriteria = Array.isArray(data.healthCriteria) ? data.healthCriteria : [];
+    try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory, oto: rawOTOEvents, wr: rawWeeklyReports, hc: rawHealthCriteria })); } catch(e) {}
   } catch(err) {
     try {
       const c = JSON.parse(localStorage.getItem("hd_history_cache") || "null");
-      if (c) { permanentHistory = c.perm || {}; rawHistory = c.raw || []; rawOTOEvents = c.oto || []; rawWeeklyReports = c.wr || []; }
+      if (c) { permanentHistory = c.perm || {}; rawHistory = c.raw || []; rawOTOEvents = c.oto || []; rawWeeklyReports = c.wr || []; rawHealthCriteria = c.hc || []; }
     } catch(e) {}
   }
   if (currentView === 'history') renderHistory();
@@ -2521,7 +2796,8 @@ let doneLog          = loadDone();
 let permanentHistory = {};
 let rawHistory       = [];
 let rawOTOEvents     = [];
-let rawWeeklyReports = [];
+let rawWeeklyReports  = [];
+let rawHealthCriteria = [];
 let pushForwardList  = loadPushFwd();
 
 // ── Identity ─────────────────────────────────────────────────────────────────
@@ -3818,6 +4094,458 @@ function renderMonths() {
   el.appendChild(list);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DOMAINS TAB
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const DOMAIN_DEFS = [
+  { key: 'vehicle', label: 'VEHICLE', emoji: '🚗' },
+  { key: 'home',    label: 'HOME',    emoji: '🏠' },
+  { key: 'finance', label: 'FINANCE', emoji: '💰' },
+  { key: 'family',  label: 'FAMILY',  emoji: '👨‍👩‍👦' },
+];
+
+// ── Criterion status evaluation ────────────────────────────────────────────────
+function evaluateCriterion(c) {
+  const now     = new Date();
+  const todayDk = dateKey(now);
+
+  // Auto-detect from history (Type A)
+  if (c.workflowType === 'auto-detect') {
+    const days   = parseInt(c.interval) || 7;
+    const cutoff = new Date(now);
+    cutoff.setDate(now.getDate() - days);
+    const cutoffDk = dateKey(cutoff);
+    const found = rawHistory.some(e =>
+      e.taskId === c.id.replace('auto-', '') || (c.notes && e.name && e.name.toLowerCase().includes((c.notes||'').toLowerCase()))
+    );
+    return found ? 'green' : 'red';
+  }
+
+  // Date-based criteria
+  if (c.nextDue) {
+    const dueDate     = new Date(c.nextDue + 'T00:00:00');
+    const warningDays = parseInt(c.warningDays) || 30;
+    const warnDate    = new Date(dueDate);
+    warnDate.setDate(dueDate.getDate() - warningDays);
+    const dueDk  = dateKey(dueDate);
+    const warnDk = dateKey(warnDate);
+
+    if (todayDk > dueDk)  return 'red';   // past due
+    if (todayDk >= warnDk) return 'amber'; // within warning window
+    return 'green';
+  }
+
+  // Recurring-modal — check lastCompleted
+  if (c.lastCompleted) {
+    const last       = new Date(c.lastCompleted + 'T00:00:00');
+    const intervalMs = (parseInt(c.interval)||1) * (c.intervalUnit==='month' ? 30 : c.intervalUnit==='year' ? 365 : 7) * 864e5;
+    const nextDue    = new Date(last.getTime() + intervalMs);
+    const warn       = new Date(nextDue);
+    warn.setDate(nextDue.getDate() - (parseInt(c.warningDays)||14));
+    if (now > nextDue) return 'red';
+    if (now >= warn)   return 'amber';
+    return 'green';
+  }
+
+  // No data yet — never completed
+  return c.status || 'amber';
+}
+
+// ── Next action text for a criterion ─────────────────────────────────────────
+function criterionNextAction(c) {
+  if (!c.nextDue && !c.lastCompleted) return null;
+  const status = evaluateCriterion(c);
+  if (c.nextDue) {
+    const d   = new Date(c.nextDue + 'T00:00:00');
+    const lbl = MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
+    if (status === 'red')   return 'Overdue — ' + lbl;
+    if (status === 'amber') return 'Due soon — ' + lbl;
+    return 'Next due ' + lbl;
+  }
+  if (c.lastCompleted) {
+    const last       = new Date(c.lastCompleted + 'T00:00:00');
+    const intervalMs = (parseInt(c.interval)||1) * (c.intervalUnit==='month' ? 30 : c.intervalUnit==='year' ? 365 : 7) * 864e5;
+    const nextDue    = new Date(last.getTime() + intervalMs);
+    const lbl = MONTHS[nextDue.getMonth()].slice(0,3) + ' ' + nextDue.getDate();
+    return 'Next due ' + lbl;
+  }
+  return null;
+}
+
+// ── Domain overall health score + word ────────────────────────────────────────
+function domainHealth(domainKey) {
+  const criteria = rawHealthCriteria.filter(c => c.domain === domainKey);
+  if (!criteria.length) return { pct: null, word: 'No criteria', color: 'amber', nextAction: null, nextDate: null };
+
+  const statuses = criteria.map(evaluateCriterion);
+  const greens   = statuses.filter(s => s === 'green').length;
+  const reds     = statuses.filter(s => s === 'red').length;
+  const pct      = Math.round(greens / criteria.length * 100);
+
+  let color = 'green', word = 'Healthy';
+  if (reds > 0)       { color = 'red';   word = 'Needs attention'; }
+  else if (pct < 100) { color = 'amber'; word = 'In progress'; }
+  else                { color = 'green'; word = 'Completely healthy'; }
+
+  // Next upcoming action across all criteria
+  const upcoming = criteria
+    .map(c => ({ c, action: criterionNextAction(c), status: evaluateCriterion(c) }))
+    .filter(x => x.action && x.status !== 'green' || (x.action && x.c.nextDue))
+    .sort((a,b) => {
+      const ad = a.c.nextDue || a.c.lastCompleted || '9999';
+      const bd = b.c.nextDue || b.c.lastCompleted || '9999';
+      return ad.localeCompare(bd);
+    })[0];
+
+  return {
+    pct, color, word,
+    nextAction: upcoming ? upcoming.action : null,
+    nextCriterion: upcoming ? upcoming.c.criterion : null,
+  };
+}
+
+// ── Render domain modal for criterion action ──────────────────────────────────
+let _dmCriterion = null;
+let _dmSubState  = {};
+
+function openDomainModal(criterionId) {
+  const c = rawHealthCriteria.find(r => r.id === criterionId);
+  if (!c) return;
+  _dmCriterion = c;
+  _dmSubState  = {};
+
+  const overlay = document.getElementById('domain-modal-overlay');
+  const modal   = document.getElementById('domain-modal');
+  document.getElementById('dm-title').textContent    = c.domain.toUpperCase() + ' · ' + c.category.toUpperCase();
+  document.getElementById('dm-subtitle').textContent = c.criterion;
+
+  const body = document.getElementById('dm-body');
+  body.innerHTML = '';
+
+  // Instructions
+  if (c.instructions) {
+    const inst = document.createElement('div');
+    inst.className = 'criterion-instructions';
+    inst.style.cssText = 'color:#444;font-size:11px;line-height:1.6;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #1a1a1a;';
+    inst.textContent = c.instructions;
+    body.appendChild(inst);
+  }
+
+  // Two-stage: booking phase
+  if (c.workflowType === 'two-stage') {
+    if (!c.bookedDate) {
+      // Phase 1: Enter booking date
+      const f = document.createElement('div');
+      f.className = 'dm-field';
+      f.innerHTML = `<div class="dm-field-label">APPOINTMENT DATE BOOKED</div>
+        <input type="date" class="dm-date-input" id="dm-booked-date" value="${c.nextDue||''}" />
+        <div class="criterion-instructions" style="margin-top:8px">Once you enter the date you booked, the health indicator will update to green — your appointment is scheduled.</div>`;
+      body.appendChild(f);
+
+      document.getElementById('dm-confirm').textContent = 'SAVE BOOKING DATE';
+      document.getElementById('dm-confirm').onclick = () => _confirmBooking(c);
+    } else {
+      // Phase 2: Completion + sub-checks
+      _renderSubChecks(body, c);
+      document.getElementById('dm-confirm').textContent = 'CONFIRM COMPLETE';
+      document.getElementById('dm-confirm').onclick = () => _confirmCompletion(c);
+    }
+  }
+
+  // Simple date: just confirm completed
+  else if (c.workflowType === 'simple-date' || c.workflowType === 'auto-renew-date') {
+    const f = document.createElement('div');
+    f.className = 'dm-field';
+    f.innerHTML = `<div class="dm-field-label">DATE COMPLETED / VERIFIED</div>
+      <input type="date" class="dm-date-input" id="dm-completed-date" value="${dateKey(new Date())}" />`;
+    body.appendChild(f);
+    if (c.workflowType === 'auto-renew-date') {
+      const f2 = document.createElement('div');
+      f2.className = 'dm-field';
+      f2.innerHTML = `<div class="dm-field-label">NEXT RENEWAL DATE</div>
+        <input type="date" class="dm-date-input" id="dm-next-due" value="${c.nextDue||''}" />`;
+      body.appendChild(f2);
+    }
+    document.getElementById('dm-confirm').textContent = 'MARK VERIFIED';
+    document.getElementById('dm-confirm').onclick = () => _confirmSimple(c);
+  }
+
+  // Recurring modal: sub-checks only
+  else if (c.workflowType === 'recurring-modal') {
+    _renderSubChecks(body, c);
+    document.getElementById('dm-confirm').textContent = 'CONFIRM COMPLETE';
+    document.getElementById('dm-confirm').onclick = () => _confirmCompletion(c);
+  }
+
+  overlay.classList.add('open');
+  modal.scrollTop = 0;
+}
+
+function _renderSubChecks(body, c) {
+  if (!c.subChecks) return;
+  let checks = [];
+  try { checks = JSON.parse(c.subChecks); } catch(e) { return; }
+
+  const list = document.createElement('div');
+  list.className = 'dm-checklist';
+
+  checks.forEach(chk => {
+    const row = document.createElement('div');
+    row.className = 'dm-check-row';
+    row.dataset.id = chk.id;
+    row.innerHTML = `<div class="dm-check-box"><span class="dm-check-tick">✓</span></div>
+      <div class="dm-check-label">${chk.label}</div>
+      ${chk.help ? '<div style="font-size:9px;color:#2a2a2a;margin-left:auto">ℹ</div>' : ''}`;
+
+    // Toggle check
+    row.addEventListener('click', (e) => {
+      const isInfo = e.target.textContent === 'ℹ';
+      if (isInfo) {
+        row.classList.toggle('expanded');
+        let help = row.nextElementSibling;
+        if (help && help.classList.contains('dm-check-help')) {
+          help.style.display = row.classList.contains('expanded') ? 'block' : 'none';
+        }
+        return;
+      }
+      row.classList.toggle('checked');
+      _dmSubState[chk.id] = row.classList.contains('checked');
+    });
+
+    list.appendChild(row);
+
+    if (chk.help) {
+      const helpEl = document.createElement('div');
+      helpEl.className = 'dm-check-help';
+      helpEl.textContent = chk.help;
+      list.appendChild(helpEl);
+    }
+  });
+
+  body.appendChild(list);
+}
+
+async function _confirmBooking(c) {
+  const dateEl = document.getElementById('dm-booked-date');
+  if (!dateEl || !dateEl.value) { alert('Please enter the date you booked.'); return; }
+  const updated = { ...c, bookedDate: dateEl.value, status: 'green' };
+  await _saveAndRefresh(updated);
+  closeDomainModal();
+}
+
+async function _confirmSimple(c) {
+  const dateEl = document.getElementById('dm-completed-date');
+  const nextEl = document.getElementById('dm-next-due');
+  const completed = dateEl ? dateEl.value : dateKey(new Date());
+  const nextDue   = nextEl ? nextEl.value : c.nextDue;
+  const updated   = { ...c, lastCompleted: completed, nextDue: nextDue || c.nextDue, bookedDate: '', status: 'green' };
+  await _saveAndRefresh(updated);
+  closeDomainModal();
+}
+
+async function _confirmCompletion(c) {
+  const completed = dateKey(new Date());
+  const updated   = { ...c, lastCompleted: completed, bookedDate: '', status: 'green' };
+  await _saveAndRefresh(updated);
+  closeDomainModal();
+}
+
+async function _saveAndRefresh(updated) {
+  // Update local state immediately
+  const idx = rawHealthCriteria.findIndex(r => r.id === updated.id);
+  if (idx >= 0) rawHealthCriteria[idx] = updated;
+  else rawHealthCriteria.push(updated);
+
+  // Update cache
+  try {
+    const c = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
+    c.hc = rawHealthCriteria;
+    localStorage.setItem('hd_history_cache', JSON.stringify(c));
+  } catch(e) {}
+
+  // Re-render domains immediately
+  renderDomains();
+
+  // Save to sheet async
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'saveHealthCriterion', criterion: updated })
+    });
+  } catch(err) { console.warn('Health criterion save failed:', err); }
+}
+
+function closeDomainModal() {
+  document.getElementById('domain-modal-overlay').classList.remove('open');
+  _dmCriterion = null;
+  _dmSubState  = {};
+}
+
+// ── Main render function ───────────────────────────────────────────────────────
+function renderDomains() {
+  const el = document.getElementById('domains-content');
+  el.innerHTML = '';
+
+  // Seed VEHICLE criteria if sheet is empty
+  if (!rawHealthCriteria.length) {
+    _seedAndRender(el);
+    return;
+  }
+
+  const activeDomains = DOMAIN_DEFS.filter(d =>
+    rawHealthCriteria.some(c => c.domain === d.key)
+  );
+
+  if (!activeDomains.length) {
+    el.innerHTML = '<div class="domains-empty">No health criteria configured yet.</div>';
+    return;
+  }
+
+  activeDomains.forEach(domain => {
+    const health   = domainHealth(domain.key);
+    const criteria = rawHealthCriteria.filter(c => c.domain === domain.key);
+
+    // Group by category
+    const categories = {};
+    criteria.forEach(c => {
+      const cat = c.category || 'General';
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push(c);
+    });
+
+    // Domain card
+    const card = document.createElement('div');
+    card.className = 'domain-card';
+
+    // Header
+    const pctText = health.pct !== null ? health.pct + '%' : '—';
+    const nextHTML = health.nextAction
+      ? `Next: <span>${health.nextCriterion}</span> · ${health.nextAction}`
+      : 'All indicators healthy';
+
+    card.innerHTML = `
+      <div class="domain-card-header" onclick="_toggleDomainCard(this)">
+        <div class="domain-header-top">
+          <div class="domain-status-dot ${health.color}"></div>
+          <div class="domain-name">${domain.emoji}  ${domain.label}</div>
+          <div class="domain-score ${health.color}">${pctText}</div>
+        </div>
+        <div class="domain-header-meta">
+          <div class="domain-status-word">${health.word}</div>
+          <div class="domain-next-action">${nextHTML}</div>
+        </div>
+      </div>
+      <div class="domain-criteria" style="display:none"></div>`;
+
+    const criteriaEl = card.querySelector('.domain-criteria');
+
+    Object.entries(categories).forEach(([catName, catCriteria]) => {
+      // Category label
+      const catLabel = document.createElement('div');
+      catLabel.className = 'criterion-category-label';
+      catLabel.textContent = catName.toUpperCase();
+      criteriaEl.appendChild(catLabel);
+
+      catCriteria.forEach(c => {
+        const status  = evaluateCriterion(c);
+        const nextAct = criterionNextAction(c);
+
+        const row = document.createElement('div');
+        row.className = `criterion-row ${status}`;
+        row.dataset.id = c.id;
+        row.innerHTML = `
+          <div class="criterion-dot ${status}"></div>
+          <div class="criterion-name">${c.criterion}</div>
+          <div class="criterion-meta">${nextAct || ''}</div>
+          <div class="criterion-chevron">▶</div>`;
+
+        // Expand/collapse detail
+        const detail = document.createElement('div');
+        detail.className = 'criterion-detail';
+
+        const statusLine = status === 'green'
+          ? (c.bookedDate ? `Appointment booked — ${_fmtDate(c.bookedDate)}` : c.lastCompleted ? `Last verified ${_fmtDate(c.lastCompleted)}` : 'Current')
+          : status === 'amber' ? 'Needs attention soon'
+          : 'Overdue — action required';
+
+        let actionLabel = 'UPDATE STATUS';
+        if (c.workflowType === 'two-stage') {
+          actionLabel = c.bookedDate ? 'CONFIRM APPOINTMENT COMPLETE' : 'ENTER BOOKING DATE';
+        } else if (c.workflowType === 'recurring-modal') {
+          actionLabel = 'MARK COMPLETE';
+        } else if (c.workflowType === 'simple-date') {
+          actionLabel = 'MARK VERIFIED';
+        } else if (c.workflowType === 'auto-renew-date') {
+          actionLabel = 'CONFIRM RENEWAL';
+        }
+
+        detail.innerHTML = `
+          <div class="criterion-detail-status">${statusLine}</div>
+          ${c.notes ? `<div class="criterion-instructions">${c.notes}</div>` : ''}
+          <button class="criterion-action-btn ${status === 'green' ? '' : 'primary'}"
+            onclick="openDomainModal('${c.id}')">${actionLabel}</button>`;
+
+        row.addEventListener('click', () => {
+          const isOpen = detail.classList.contains('open');
+          // Close all others in this card
+          criteriaEl.querySelectorAll('.criterion-detail.open').forEach(d => d.classList.remove('open'));
+          criteriaEl.querySelectorAll('.criterion-row.expanded').forEach(r => r.classList.remove('expanded'));
+          if (!isOpen) {
+            detail.classList.add('open');
+            row.classList.add('expanded');
+          }
+        });
+
+        criteriaEl.appendChild(row);
+        criteriaEl.appendChild(detail);
+      });
+    });
+
+    el.appendChild(card);
+  });
+}
+
+function _toggleDomainCard(header) {
+  const criteriaEl = header.nextElementSibling;
+  const isOpen = criteriaEl.style.display !== 'none';
+  criteriaEl.style.display = isOpen ? 'none' : 'block';
+}
+
+function _fmtDate(dk) {
+  if (!dk) return '—';
+  const d = new Date(dk + 'T00:00:00');
+  return MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+async function _seedAndRender(el) {
+  el.innerHTML = '<div class="domains-empty">Setting up health criteria…</div>';
+  try {
+    const res  = await fetch(API_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'seedVehicleCriteria' })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      // Reload health criteria from sheet
+      const res2  = await fetch(API_URL);
+      const data2 = await res2.json();
+      rawHealthCriteria = Array.isArray(data2.healthCriteria) ? data2.healthCriteria : [];
+      try {
+        const c = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
+        c.hc = rawHealthCriteria;
+        localStorage.setItem('hd_history_cache', JSON.stringify(c));
+      } catch(e) {}
+      renderDomains();
+    }
+  } catch(err) {
+    el.innerHTML = '<div class="domains-empty">Could not load health criteria. Check connection.</div>';
+  }
+}
+
+
 // ─── RIGHT COLUMN: TODAY ─────────────────────────────────────────────────────
 function updateRightColumn(pct, doneCount, total, remaining, coreTasks, key, bonusDone) {
   // coreTasks = OTO + recurring due today ONLY. Get-ahead bonus tasks excluded.
@@ -4263,9 +4991,11 @@ function switchView(view) {
   document.getElementById("view-today").style.display   = view === 'today'   ? 'block' : 'none';
   document.getElementById("view-week").style.display    = view === 'week'    ? 'block' : 'none';
   document.getElementById("view-history").style.display = view === 'history' ? 'block' : 'none';
+  document.getElementById("view-domains").style.display = view === 'domains' ? 'block' : 'none';
   document.getElementById("edit-btn").style.display     = view === 'today'   ? 'block' : 'none';
   if (view === 'today')   render();
   if (view === 'week')    renderWeek();
+  if (view === 'domains') renderDomains();
   if (view === 'history') {
     // Always reset to LOG tab when entering History
     histTab = 'log';
@@ -4520,7 +5250,7 @@ try {
 syncFromSheet(); // catch-up runs inside after first sync
 restoreIdentityUI(); // restore identity button state
 syncTodayState(); // immediate cross-device state sync on load
-fetchHistory().then(() => buildWeeklyReport());
+fetchHistory().then(() => { buildWeeklyReport(); if (currentView === 'domains') renderDomains(); });
 fetchWeather();
 setInterval(syncFromSheet, SYNC_MS);
 setInterval(syncTodayState, 15 * 1000); // sync checked state every 15s
