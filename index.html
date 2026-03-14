@@ -281,6 +281,15 @@
   }
   .task-row.once.done .task-freq.stamped { color: #3a5a3a; }
 
+  /* Hard-deadline OTO — red when on or past targetDate */
+  .task-row.hard-due {
+    background: rgba(248,113,113,0.07);
+    border-color: rgba(248,113,113,0.25);
+  }
+  .task-row.hard-due .task-name  { color: #f87171; }
+  .task-row.hard-due .task-freq  { color: #7a3a3a; }
+  .task-row.hard-due .task-emoji { filter: grayscale(0.3); }
+
 
 
   /* ── TASK WRAPPER ── */
@@ -3275,12 +3284,15 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
   wrap.dataset.taskId = task.id;
   const row = document.createElement('div');
   row.dataset.id = task.id;
-  const isOverdue = !isDone && isOnce && task.targetDate && isOTOOverdue(task);
+  const isOverdue    = !isDone && isOnce && task.targetDate && isOTOOverdue(task);
+  const isHardDue    = !isDone && isOnce && task.hardDeadline && task.targetDate
+                       && task.targetDate <= todayKey;
   const isCarried = !isDone && pushForwardList.includes(task.id);
   row.className = 'task-row'
     + (isDone         ? ' done'     : '')
     + (isOnce         ? ' once'     : '')
     + (isOverdue      ? ' overdue'  : '')
+    + (isHardDue      ? ' hard-due' : '')
     + (isReadOnly     ? ' readonly' : '')
     + (aheadBadgeText ? ' ahead'    : '');
 
@@ -4660,8 +4672,13 @@ const CRITERION_TASKS = {
   'veh-license': {
     linkedTaskId: 'v08',
     name: "Renew driver's licence",
-    emoji: '🪪', freq: 'once', type: 'once',
-    getTargetDate: (c) => c.nextDue || dateKey(new Date()),
+    emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true,
+    getTargetDate: (c) => {
+      if (!c.nextDue) return dateKey(new Date());
+      const d = new Date(c.nextDue + 'T00:00:00');
+      d.setDate(d.getDate() - parseInt(c.warningDays || 60));
+      return dateKey(d);
+    },
     notes: 'Go to any Alberta registry agent. Bring current licence and payment. No appointment needed.',
   },
   'veh-registration': {
@@ -4705,7 +4722,7 @@ const CRITERION_TASKS = {
   'veh-interior': {
     linkedTaskId: null,
     name: 'Car interior clean & organized',
-    emoji: '🚗', freq: 'biweekly', type: '',
+    emoji: '🚗', freq: 'monthly', type: '',
     getTargetDate: null, dow: 1,
     notes: 'Vacuum, wipe dash, clean windows inside, check glove box docs present.',
   },
@@ -4951,6 +4968,12 @@ function evaluateCriterion(c) {
 
   if (activeToday) return 'amber';
 
+  // ── Amber: within warningDays window of nextDue ───────────────────────────
+  if (c.nextDue && c.warningDays) {
+    const daysLeft = (new Date(c.nextDue + 'T00:00:00') - now) / 864e5;
+    if (daysLeft >= 0 && daysLeft <= parseInt(c.warningDays)) return 'amber';
+  }
+
   // ── Red: genuinely overdue with no completion ─────────────────────────────
   if (c.nextDue && todayDk > c.nextDue) return 'red';
   if (c.lastCompleted) {
@@ -5056,11 +5079,32 @@ async function checkAndGenerateOTOs() {
     if (!def) continue; // no task definition for this criterion yet
 
     const canonicalName = def.name;
-    // Don't create if new canonical name OR old [HEALTH] name already exists
-    const exists = allTasks.some(t =>
+    // Check if task already exists by canonical name or old [HEALTH] name
+    const existing = allTasks.find(t =>
       t.name === canonicalName || t.name === '[HEALTH] ' + c.criterion
     );
-    if (exists) continue;
+
+    // For OTO criteria: if task exists but targetDate is wrong, update it
+    if (existing && def.type === 'once' && def.getTargetDate) {
+      const correctTarget = def.getTargetDate(c);
+      if (existing.targetDate !== correctTarget && correctTarget) {
+        try {
+          // Delete old, will be recreated below with correct targetDate
+          await fetch(API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'deleteTask', taskId: existing.id })
+          });
+          // Remove from allTasks so creation proceeds below
+          const idx = allTasks.indexOf(existing);
+          if (idx >= 0) allTasks.splice(idx, 1);
+          console.log('[DOMAINS] Updating OTO targetDate for:', canonicalName, '->', correctTarget);
+        } catch(e) { continue; } // if delete fails, skip to avoid duplicate
+      } else {
+        continue; // task exists with correct targetDate
+      }
+    } else if (existing) {
+      continue; // non-OTO task already exists
+    }
 
     const sectionMap = { vehicle: 'vehicle', home: 'home', finance: 'finance', family: 'family' };
     const task = {
@@ -5074,7 +5118,8 @@ async function checkAndGenerateOTOs() {
 
     // OTO gets a targetDate; yearly recurring gets dueDate+yearMonth+dotm; biweekly gets anchorDate
     if (def.type === 'once') {
-      task.targetDate = def.getTargetDate(c);
+      task.targetDate   = def.getTargetDate(c);
+      if (def.hardDeadline) task.hardDeadline = true;
     } else if (def.freq === 'yearly') {
       task.dueDate   = def.dueDate;    // MM-DD — isGetAheadTask reads this
       task.yearMonth = def.yearMonth;
