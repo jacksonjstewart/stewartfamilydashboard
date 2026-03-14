@@ -1768,7 +1768,16 @@
   .criterion-linked-status {
     font-family: 'Outfit', sans-serif;
     font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
-    flex-shrink: 0; text-align: right;
+    flex-shrink: 0; text-align: right; line-height: 1.6;
+  }
+  .linked-current-badge {
+    display: inline-block;
+    font-family: 'Outfit', sans-serif;
+    font-size: 7px; font-weight: 700; letter-spacing: 1.5px;
+    color: #7dd3fc; background: rgba(125,211,252,0.08);
+    border: 1px solid rgba(125,211,252,0.18);
+    border-radius: 4px; padding: 1px 5px;
+    vertical-align: middle; margin-right: 4px;
   }
 
     /* Domains empty state */
@@ -4521,7 +4530,9 @@ function renderDomains() {
                 <div class="criterion-linked-name">${linkedTask.name}</div>
                 <div class="criterion-linked-freq">${freqLabel(linkedTask) || (linkedTask.type === 'once' ? 'One time only' : '')}</div>
               </div>
-              <div class="criterion-linked-status" style="color:${linkedStatus ? linkedStatus.color : '#444'}">${linkedStatus ? linkedStatus.label : ''}</div>
+              <div class="criterion-linked-status" style="color:${linkedStatus ? linkedStatus.color : '#444'}">
+                ${linkedStatus && linkedStatus.current ? '<span class="linked-current-badge">CURRENT</span> ' : ''}${linkedStatus ? linkedStatus.label : ''}
+              </div>
              </div>`
           : `<div class="criterion-linked-task">
               <span class="criterion-linked-name" style="color:#2a2a2a;font-style:italic">Linked task will appear after next sync…</span>
@@ -4674,16 +4685,21 @@ function _linkedTaskStatus(task) {
   if (task.dueDate) {
     const days = daysUntilDue(task);
     if (days !== null && days <= GET_AHEAD_LEAD_DAYS) {
-      return { label: days <= 0 ? 'OVERDUE' : 'GET AHEAD · ' + days + 'd', color: '#facc15' };
+      return { label: days <= 0 ? 'OVERDUE' : 'GET AHEAD · ' + days + 'd', color: '#7dd3fc', current: true };
     }
     const now  = new Date(todayKey + 'T00:00:00');
     const year = now.getFullYear();
     const due  = parseDueDate(task.dueDate, year) || parseDueDate(task.dueDate, year+1);
     return { label: due ? _fmtDate(dateKey(due)) : freqLabel(task), color: '#444' };
   }
+  // Check if due today (recurring)
+  if (isDueOn(task, new Date(todayKey + 'T00:00:00'))) {
+    const isDone = !!doneLog[task.id + '_' + todayKey];
+    if (!isDone) return { label: 'DUE TODAY', color: '#facc15', current: true };
+  }
   // Recurring — compute actual next occurrence date
   const next = _nextOccurrence(task);
-  return { label: next ? _fmtDate(next) : freqLabel(task), color: '#444' };
+  return { label: next ? _fmtDate(next) : freqLabel(task), color: '#555' };
 }
 
 // Next calendar date a recurring task will fire (searches up to 400 days ahead)
