@@ -2584,6 +2584,7 @@ function parseCSV(text) {
       type:        taskType,
       targetDate:  (obj["targetdate"] || "").trim(),
       dueDate:     (obj["duedate"]    || "").trim(),  // MM-DD annual deadline for get-ahead
+      anchorDate:  (obj["anchordate"] || "").trim(),  // YYYY-MM-DD anchor for biweekly tasks
     };
   }).filter(t => (t.id || t.type === 'once') && t.name)
     .map(t => {
