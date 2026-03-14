@@ -4771,6 +4771,13 @@ async function checkAndGenerateOTOs() {
 
   // Always sync so linked task display is current
   await syncFromSheet();
+  // Repair any biweekly tasks that ended up without an anchor date
+  fetch(API_URL, {
+    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'repairBiweeklyAnchors' })
+  }).then(r => r.json()).then(d => {
+    if (d.patched > 0) { console.log('[DOMAINS] Repaired', d.patched, 'biweekly anchor(s)'); syncFromSheet(); }
+  }).catch(() => {});
   if (currentView === 'domains') renderDomains();
 }
 
