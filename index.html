@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>Steward · v0.6</title>
+<title>Steward · v0.7</title>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1832,7 +1832,7 @@
     </div>
   </div>
   <div id="splash-rule"></div>
-  <div id="splash-sub">STEWARD · v0.6</div>
+  <div id="splash-sub">STEWARD · v0.7</div>
 </div>
 
 <!-- ── WEEKLY REPORT ──────────────────────────────────────────────────────── -->
@@ -2153,7 +2153,7 @@
 
     <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">STEWARD · v0.6</div>
+    <div id="version-tag">STEWARD · v0.7</div>
   </div>
   </div>
 
@@ -3324,15 +3324,18 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
       if (e.target.closest('.task-chevron')) { wrap.classList.toggle('open'); return; }
       if (e.target.closest('.task-remove')) return;
 
-      // Hard-deadline OTO linked to a health criterion — intercept and open date modal
-      if (task.hardDeadline && task.type === 'once' && !doneLog[task.id + '_' + todayKey]) {
-        const crit = typeof rawHealthCriteria !== 'undefined'
-          ? rawHealthCriteria.find(c => {
-              const def = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
-              return def && (def.linkedTaskId === task.id || def.name === task.name);
-            })
-          : null;
-        if (crit) { _openDateShiftModal(crit, task); return; }
+      // OTO linked to a health criterion that needs date entry — intercept and open date modal
+      if (task.type === 'once' && !doneLog[task.id + '_' + todayKey]
+          && typeof rawHealthCriteria !== 'undefined') {
+        const crit = rawHealthCriteria.find(c => {
+          // Use _criterionLinkedTask for robust matching (handles id, name, [HEALTH] fallback)
+          const linked = _criterionLinkedTask(c);
+          return linked && linked.id === task.id;
+        });
+        // Only intercept if criterion requires date input
+        if (crit && (crit.workflowType === 'simple-date' || crit.workflowType === 'auto-renew-date')) {
+          _openDateShiftModal(crit, task); return;
+        }
       }
 
       toggleTask(task.id);
@@ -4691,7 +4694,7 @@ const CRITERION_TASKS = {
   'veh-license': {
     linkedTaskId: 'v08',
     name: "Renew driver's licence",
-    emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true, validated: true,
+    emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true,
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
       const d = new Date(c.nextDue + 'T00:00:00');
@@ -4703,7 +4706,7 @@ const CRITERION_TASKS = {
   'veh-registration': {
     linkedTaskId: null,
     name: 'Renew vehicle registration',
-    emoji: '📋', freq: 'once', type: 'once', hardDeadline: true, validated: true,
+    emoji: '📋', freq: 'once', type: 'once', hardDeadline: true,
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
       const d = new Date(c.nextDue + 'T00:00:00');
