@@ -2255,6 +2255,7 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const SECTIONS = [
   { key:"home",    label:"Household", accent:"#4ade80" },
   { key:"vehicle", label:"Vehicle",   accent:"#e8e8e8" },
+  { key:"digital", label:"Digital",   accent:"#7dd3fc" },
   { key:"finance", label:"Finance",   accent:"#facc15" },
   { key:"family",  label:"Family",    accent:"#f4a4b8" },
 ];
@@ -3241,19 +3242,22 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
     notesHTML = inner;
   }
 
-  // Health indicator stamp — look up which criterion this task is linked to
+  // Health indicator stamp — lazy lookup, safe before CRITERION_TASKS initialises
   const healthStamp = (() => {
-    if (!task.id) return '';
-    // Check CRITERION_TASKS for a matching linkedTaskId or canonical name
-    for (const [critId, def] of Object.entries(CRITERION_TASKS)) {
-      if (def.linkedTaskId === task.id || def.name === task.name) {
-        const crit = rawHealthCriteria.find(c => c.id === critId);
-        const domainLabel = critId.split('-')[0].toUpperCase();
-        const critName    = crit ? crit.criterion : critId;
-        return `<div class="task-health-stamp">${task.id} · ${domainLabel}: ${critName}</div>`;
+    if (!task.id) return `<div class="task-health-stamp">${task.id || ''}</div>`;
+    try {
+      if (typeof CRITERION_TASKS !== 'undefined') {
+        for (const [critId, def] of Object.entries(CRITERION_TASKS)) {
+          if (def.linkedTaskId === task.id || def.name === task.name) {
+            const crit       = Array.isArray(rawHealthCriteria)
+              ? rawHealthCriteria.find(c => c.id === critId) : null;
+            const domainLabel = critId.split('-')[0].toUpperCase();
+            const critName    = crit ? crit.criterion : critId;
+            return `<div class="task-health-stamp">${task.id} · ${domainLabel}: ${critName}</div>`;
+          }
+        }
       }
-    }
-    // No match found — show just the ID
+    } catch(e) {}
     return `<div class="task-health-stamp">${task.id}</div>`;
   })();
 
