@@ -4708,25 +4708,35 @@ function _fmtDate(dk) {
 const CRITERION_TASKS = {
   'veh-license': {
     linkedTaskId: null,
+    permanentId: 'veh-license-renewal',
     name: "Renew driver's license",
     emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true, workflowType: 'simple-date',
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
-      const d = new Date(c.nextDue + 'T00:00:00');
-      d.setDate(d.getDate() - parseInt(c.warningDays || 60));
-      return dateKey(d);
+      // Use UTC to avoid timezone offset shifting the date by one day
+      const ms = Date.UTC(
+        parseInt(c.nextDue.slice(0,4)),
+        parseInt(c.nextDue.slice(5,7)) - 1,
+        parseInt(c.nextDue.slice(8,10))
+      ) - parseInt(c.warningDays || 60) * 864e5;
+      return dateKey(new Date(ms));
     },
     notes: 'Go to any Alberta registry agent. Bring current licence and payment. No appointment needed.',
   },
   'veh-registration': {
     linkedTaskId: null,
+    permanentId: 'veh-registration-renewal',
     name: 'Renew vehicle registration',
     emoji: '📋', freq: 'once', type: 'once', hardDeadline: true, workflowType: 'simple-date',
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
-      const d = new Date(c.nextDue + 'T00:00:00');
-      d.setDate(d.getDate() - parseInt(c.warningDays || 60));
-      return dateKey(d);
+      // Use UTC to avoid timezone offset shifting the date by one day
+      const ms = Date.UTC(
+        parseInt(c.nextDue.slice(0,4)),
+        parseInt(c.nextDue.slice(5,7)) - 1,
+        parseInt(c.nextDue.slice(8,10))
+      ) - parseInt(c.warningDays || 60) * 864e5;
+      return dateKey(new Date(ms));
     },
     notes: 'Renew at any Alberta registry agent. Bring current registration and insurance.',
   },
@@ -5123,35 +5133,49 @@ async function checkAndGenerateOTOs() {
     if (!def) continue; // no task definition for this criterion yet
 
     const canonicalName = def.name;
-    // Check if task already exists by canonical name or old [HEALTH] name
-    const existing = allTasks.find(t =>
-      t.name === canonicalName || t.name === '[HEALTH] ' + c.criterion
-    );
+    const pid           = def.permanentId || null;
 
-    // For OTO criteria: if task exists but is wrong type or wrong targetDate, replace it
-    if (existing && def.type === 'once' && def.getTargetDate) {
+    // For permanent-ID OTO criteria: find by id or name, update in place if wrong
+    if (def.type === 'once' && def.getTargetDate) {
       const correctTarget = def.getTargetDate(c);
-      const wrongType   = existing.type !== 'once';
-      const wrongTarget = existing.targetDate !== correctTarget;
-      if ((wrongType || wrongTarget) && correctTarget) {
-        try {
-          await fetch(API_URL, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'deleteTask', taskId: existing.id })
-          });
-          const idx = allTasks.indexOf(existing);
-          if (idx >= 0) allTasks.splice(idx, 1);
-          console.log('[DOMAINS] Replacing task for:', canonicalName, '-> OTO', correctTarget);
-        } catch(e) { continue; }
-      } else {
-        continue; // task exists and is correct
+      if (!correctTarget) continue;
+
+      // Find existing by permanentId first, then by name
+      const existing = pid
+        ? allTasks.find(t => t.id === pid || t.name === canonicalName)
+        : allTasks.find(t => t.name === canonicalName || t.name === '[HEALTH] ' + c.criterion);
+
+      if (existing) {
+        const wrongType   = existing.type !== 'once' && existing.freq !== 'once';
+        const wrongTarget = existing.targetDate !== correctTarget;
+        if (wrongType || wrongTarget) {
+          // Recycle in place — update the existing row, no deletion
+          try {
+            await fetch(API_URL, {
+              method: 'POST', headers: { 'Content-Type': 'text/plain' },
+              body: JSON.stringify({ action: 'updateTask', taskId: existing.id,
+                fields: { targetdate: correctTarget, type: 'once', frequency: 'once' } })
+            });
+            // Update local copy
+            existing.targetDate = correctTarget;
+            existing.type = 'once';
+            existing.freq = 'once';
+          } catch(e) { /* silent */ }
+        }
+        continue; // task exists (corrected or already right)
       }
-    } else if (existing) {
-      continue; // non-OTO task already exists — leave it
+      // No existing task — create with permanentId
+    } else {
+      // Non-OTO: skip if already exists
+      const existing = allTasks.find(t =>
+        t.name === canonicalName || t.name === '[HEALTH] ' + c.criterion
+      );
+      if (existing) continue;
     }
 
     const sectionMap = { vehicle: 'vehicle', home: 'home', finance: 'finance', family: 'family' };
     const task = {
+      id:      pid || undefined,   // use permanentId if defined
       name:    canonicalName,
       emoji:   def.emoji || '🔔',
       section: sectionMap[c.domain] || 'home',
@@ -5354,7 +5378,7 @@ function _openDateShiftModal(c, linked) {
     const updated = { ...c, lastCompleted: completedDate, nextDue: newNextDue || c.nextDue, bookedDate: '' };
     await _saveAndRefresh(updated);
 
-    // Mark linked OTO done for today and retire it from DESIGN
+    // Mark linked OTO done for today (non-permanent until midnight commit)
     if (linked && (linked.type === 'once' || linked.freq === 'once')) {
       const key = linked.id + '_' + todayKey;
       if (!doneLog[key]) {
@@ -5364,19 +5388,29 @@ function _openDateShiftModal(c, linked) {
         saveDone(doneLog);
         writeCheckToSheet(linked.id, ts);
       }
-      // Delete the old OTO from DESIGN — it's been completed
-      try {
-        await fetch(API_URL, {
-          method: 'POST', headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'deleteTask', taskId: linked.id })
-        });
-        // Sync sheet so the deleted task disappears
-        await syncFromSheet();
-      } catch(e) { console.warn('deleteTask failed:', e); }
+      // Recycle the OTO in place — update targetDate to new reminder date, no deletion
+      if (newNextDue) {
+        const def           = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
+        const newTargetDate = def && def.getTargetDate
+          ? def.getTargetDate({ ...c, nextDue: newNextDue })
+          : null;
+        if (newTargetDate) {
+          try {
+            await fetch(API_URL, {
+              method: 'POST', headers: { 'Content-Type': 'text/plain' },
+              body: JSON.stringify({ action: 'updateTask', taskId: linked.id,
+                fields: { targetdate: newTargetDate } })
+            });
+            // Update local sheetTasks so UI reflects new date immediately
+            const lt = sheetTasks.find(t => t.id === linked.id);
+            if (lt) lt.targetDate = newTargetDate;
+          } catch(e) { console.warn('updateTask failed:', e); }
+        }
+      }
     }
 
-    // Regenerate a new future OTO for this criterion at the correct future date
-    await checkAndGenerateOTOs();
+    // Sync and re-render — no regeneration needed, task was recycled in place
+    await syncFromSheet();
     closeDomainModal();
     render();
     if (currentView === 'domains') renderDomains();
