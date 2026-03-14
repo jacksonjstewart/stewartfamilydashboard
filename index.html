@@ -1760,10 +1760,15 @@
     font-size: 10px; font-weight: 500; color: #666;
     flex: 1; letter-spacing: 0.2px;
   }
-  .criterion-linked-date {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 12px; font-weight: 300; font-style: italic;
-    color: #444;
+  .criterion-linked-freq {
+    font-family: 'Outfit', sans-serif;
+    font-size: 8.5px; color: #333; letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+  .criterion-linked-status {
+    font-family: 'Outfit', sans-serif;
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    flex-shrink: 0; text-align: right;
   }
 
     /* Domains empty state */
@@ -4507,15 +4512,19 @@ function renderDomains() {
         }
 
         // Find linked OTO or recurring task
-        const linkedTask = _criterionLinkedTask(c);
+        const linkedTask   = _criterionLinkedTask(c);
+        const linkedStatus = linkedTask ? _linkedTaskStatus(linkedTask) : null;
         const linkedHTML = linkedTask
           ? `<div class="criterion-linked-task">
               <span class="criterion-linked-dot ${linkedTask.type === 'once' ? 'oto' : 'rec'}"></span>
-              <span class="criterion-linked-name">${linkedTask.name}</span>
-              <span class="criterion-linked-date">${linkedTask.targetDate ? '· ' + _fmtDate(linkedTask.targetDate) : linkedTask.freq ? '· ' + linkedTask.freq : ''}</span>
+              <div style="flex:1;min-width:0">
+                <div class="criterion-linked-name">${linkedTask.name}</div>
+                <div class="criterion-linked-freq">${freqLabel(linkedTask) || (linkedTask.type === 'once' ? 'One time only' : '')}</div>
+              </div>
+              <div class="criterion-linked-status" style="color:${linkedStatus ? linkedStatus.color : '#444'}">${linkedStatus ? linkedStatus.label : ''}</div>
              </div>`
-          : `<div class="criterion-linked-task generating">
-              <span class="criterion-linked-name" style="color:#2a2a2a;font-style:italic">Linked task will generate on next sync…</span>
+          : `<div class="criterion-linked-task">
+              <span class="criterion-linked-name" style="color:#2a2a2a;font-style:italic">Linked task will appear after next sync…</span>
              </div>`;
 
         detail.innerHTML = `
@@ -4558,51 +4567,54 @@ function _fmtDate(dk) {
 }
 
 // ─── DOMAIN HEALTH: TASK GENERATION ──────────────────────────────────────────
-// Runs on every load after sheet data is available.
-// Each health criterion has a defined task — either a recurring task that keeps
-// it healthy, or a date-triggered OTO that prompts action when due.
-// GREEN criteria still need future tasks — green means healthy NOW, not forever.
-// Idempotent — matches by canonical task name, never duplicates.
+// Each criterion maps to a task. Resolution order:
+//   1. linkedTaskId — reference an existing DESIGN task by ID (preferred)
+//   2. Canonical name match in sheetTasks/customTasks
+//   3. Old [HEALTH] tag fallback (transitional)
+//   4. Auto-generate if nothing found
+// GREEN criteria still get tasks — green = healthy now, task keeps it healthy.
 
-// Per-criterion task definitions — what task keeps this criterion healthy
 const CRITERION_TASKS = {
   'veh-license': {
-    name: 'Renew driver\'s licence',
+    linkedTaskId: 'v08',
+    name: "Renew driver's licence",
     emoji: '🪪', freq: 'once', type: 'once',
     getTargetDate: (c) => c.nextDue || dateKey(new Date()),
     notes: 'Go to any Alberta registry agent. Bring current licence and payment. No appointment needed.',
   },
   'veh-registration': {
+    linkedTaskId: null,
     name: 'Renew vehicle registration',
     emoji: '📋', freq: 'once', type: 'once',
     getTargetDate: (c) => c.nextDue || dateKey(new Date()),
     notes: 'Renew at any Alberta registry agent. Bring current registration and insurance.',
   },
   'veh-insurance': {
+    linkedTaskId: null,
     name: 'Confirm insurance auto-renewal',
     emoji: '🛡️', freq: 'once', type: 'once',
-    // Prompt 30 days before renewal to confirm it went through
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
       const d = new Date(c.nextDue + 'T00:00:00');
       d.setDate(d.getDate() - 14);
       return dateKey(d);
     },
-    notes: 'Verify auto-renewal confirmation received from Belair/Johnson. Confirm payment processed. Update next renewal date in DOMAINS.',
+    notes: 'Verify auto-renewal confirmation received from Belair/Johnson. Confirm payment processed.',
   },
   'veh-oil-change': {
+    linkedTaskId: null,
     name: 'Book oil change & mechanic inspection',
     emoji: '🔧', freq: 'once', type: 'once',
-    // Prompt 30 days before next due
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
       const d = new Date(c.nextDue + 'T00:00:00');
       d.setDate(d.getDate() - (parseInt(c.warningDays) || 30));
       return dateKey(d);
     },
-    notes: 'Book at Toyota of the Trail (free lifetime oil changes). Record booking date in DOMAINS → Oil Change criterion.',
+    notes: 'Book at Toyota of the Trail (free lifetime oil changes). Record booking date in DOMAINS.',
   },
   'veh-tires': {
+    linkedTaskId: null,
     name: 'Check tire condition & pressure',
     emoji: '🔄', freq: 'once', type: 'once',
     getTargetDate: (c) => {
@@ -4611,15 +4623,14 @@ const CRITERION_TASKS = {
       d.setDate(d.getDate() - (parseInt(c.warningDays) || 21));
       return dateKey(d);
     },
-    notes: 'Inspect tread depth, sidewalls, and pressure. Check for even wear. Record outcome in DOMAINS → Tire Condition criterion.',
+    notes: 'Inspect tread depth, sidewalls, and pressure. Check for even wear.',
   },
   'veh-interior': {
+    linkedTaskId: null,
     name: 'Car interior clean & organized',
     emoji: '🚗', freq: 'biweekly', type: '',
-    // Biweekly Monday — dow=1, anchor to next Monday
-    getTargetDate: null,
-    dow: 1,
-    notes: 'Vacuum, wipe dash, clean windows inside, check glove box docs present. Complete checklist in DOMAINS → Interior Clean criterion.',
+    getTargetDate: null, dow: 1,
+    notes: 'Vacuum, wipe dash, clean windows inside, check glove box docs present.',
   },
 };
 
@@ -4629,13 +4640,63 @@ function _criterionCanonicalName(c) {
 }
 
 function _criterionLinkedTask(c) {
-  const name     = _criterionCanonicalName(c);
+  const def      = CRITERION_TASKS[c.id];
   const allTasks = [...sheetTasks, ...customTasks];
-  // Match by new canonical name first, then fall back to old [HEALTH] tag
-  return allTasks.find(t => t.name === name)
-      || allTasks.find(t => t.name === '[HEALTH] ' + c.criterion)
-      || null;
+
+  // 1. Existing DESIGN task by ID
+  if (def && def.linkedTaskId) {
+    const byId = allTasks.find(t => t.id === def.linkedTaskId);
+    if (byId) return byId;
+  }
+  // 2. Canonical name match
+  if (def) {
+    const byName = allTasks.find(t => t.name === def.name);
+    if (byName) return byName;
+  }
+  // 3. Old [HEALTH] tag fallback
+  return allTasks.find(t => t.name === '[HEALTH] ' + c.criterion) || null;
 }
+
+// Rich status label for the linked task relative to today
+function _linkedTaskStatus(task) {
+  if (!task) return null;
+  const isDone = !!doneLog[task.id + '_' + todayKey];
+  if (isDone) return { label: 'DONE TODAY', color: '#4ade80' };
+  if (task.type === 'once' && task.targetDate) {
+    const diff = Math.round(
+      (new Date(task.targetDate + 'T00:00:00') - new Date(todayKey + 'T00:00:00')) / 864e5
+    );
+    if (diff < 0)   return { label: 'OVERDUE',                  color: '#f87171' };
+    if (diff === 0) return { label: 'DUE TODAY',                 color: '#facc15' };
+    if (diff <= 7)  return { label: 'DUE IN ' + diff + ' DAYS',  color: '#facc15' };
+    return { label: _fmtDate(task.targetDate), color: '#555' };
+  }
+  if (task.dueDate) {
+    const days = daysUntilDue(task);
+    if (days !== null && days <= GET_AHEAD_LEAD_DAYS) {
+      return { label: days <= 0 ? 'OVERDUE' : 'GET AHEAD · ' + days + 'd', color: '#facc15' };
+    }
+    const now  = new Date(todayKey + 'T00:00:00');
+    const year = now.getFullYear();
+    const due  = parseDueDate(task.dueDate, year) || parseDueDate(task.dueDate, year+1);
+    return { label: due ? _fmtDate(dateKey(due)) : freqLabel(task), color: '#444' };
+  }
+  // Recurring — compute actual next occurrence date
+  const next = _nextOccurrence(task);
+  return { label: next ? _fmtDate(next) : freqLabel(task), color: '#444' };
+}
+
+// Next calendar date a recurring task will fire (searches up to 400 days ahead)
+function _nextOccurrence(task) {
+  const start = new Date(todayKey + 'T00:00:00');
+  for (let i = 0; i <= 400; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    if (isDueOn(task, d)) return dateKey(d);
+  }
+  return null;
+}
+
 
 async function checkAndGenerateOTOs() {
   if (!rawHealthCriteria.length) return;
