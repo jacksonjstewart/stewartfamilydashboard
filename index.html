@@ -1743,7 +1743,30 @@
   #dm-confirm:hover { border-color: #4ade80; color: #4ade80; }
   #dm-confirm:active { transform: scale(0.97); }
 
-  /* Domains empty state */
+  /* Linked task row in criterion detail */
+  .criterion-linked-task {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; margin-bottom: 10px;
+    background: #0a0a0a; border: 1px solid #141414;
+    border-radius: 8px;
+  }
+  .criterion-linked-dot {
+    width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+  }
+  .criterion-linked-dot.oto { background: #facc15; }
+  .criterion-linked-dot.rec { background: #4ade80; }
+  .criterion-linked-name {
+    font-family: 'Outfit', sans-serif;
+    font-size: 10px; font-weight: 500; color: #666;
+    flex: 1; letter-spacing: 0.2px;
+  }
+  .criterion-linked-date {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 12px; font-weight: 300; font-style: italic;
+    color: #444;
+  }
+
+    /* Domains empty state */
   .domains-empty {
     font-family: 'Cormorant Garamond', serif;
     font-size: 15px; font-style: italic; color: #2a2a2a;
@@ -4483,9 +4506,24 @@ function renderDomains() {
           actionLabel = 'CONFIRM AUTO-RENEWAL';
         }
 
+        // Find linked OTO or recurring task
+        const linkedTask = _criterionLinkedTask(c);
+        const linkedHTML = linkedTask
+          ? `<div class="criterion-linked-task">
+              <span class="criterion-linked-dot ${linkedTask.type === 'once' ? 'oto' : 'rec'}"></span>
+              <span class="criterion-linked-name">${linkedTask.name.replace('[HEALTH] ','')}</span>
+              <span class="criterion-linked-date">${linkedTask.targetDate ? '· ' + _fmtDate(linkedTask.targetDate) : linkedTask.freq || ''}</span>
+             </div>`
+          : status !== 'green'
+            ? `<div class="criterion-linked-task generating">
+                <span class="criterion-linked-name" style="color:#2a2a2a;font-style:italic">Generating task on next sync…</span>
+               </div>`
+            : '';
+
         detail.innerHTML = `
           <div class="criterion-detail-status">${statusLine}</div>
-          ${c.notes ? `<div class="criterion-instructions">${c.notes}</div>` : ''}
+          ${linkedHTML}
+          ${c.instructions ? `<div class="criterion-instructions">${c.instructions}</div>` : ''}
           <button class="criterion-action-btn ${status === 'green' ? '' : 'primary'}"
             onclick="openDomainModal('${c.id}')">${actionLabel}</button>`;
 
@@ -4519,6 +4557,93 @@ function _fmtDate(dk) {
   if (!dk) return '—';
   const d = new Date(dk + 'T00:00:00');
   return MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+// ─── DOMAIN HEALTH: OTO GENERATION ───────────────────────────────────────────
+// Runs on every load. For each health criterion that is amber or red and has
+// no corresponding OTO already in sheetTasks or customTasks, creates one.
+// Idempotent — matches by a canonical task name tag so it never duplicates.
+
+function _criterionOTOName(c) {
+  // Canonical OTO name format — used to detect duplicates
+  return '[HEALTH] ' + c.criterion;
+}
+
+function _criterionLinkedTask(c) {
+  // Find an existing task in sheetTasks/customTasks that matches this criterion
+  const canonicalName = _criterionOTOName(c);
+  const allTasks = [...sheetTasks, ...customTasks];
+  return allTasks.find(t => t.name === canonicalName) || null;
+}
+
+function _criterionTargetDate(c) {
+  // Determine what targetDate to use for the generated OTO
+  if (c.workflowType === 'two-stage' && !c.bookedDate) {
+    // For two-stage: target date is the warning start date (prompt to book ahead)
+    if (c.nextDue) {
+      const due  = new Date(c.nextDue + 'T00:00:00');
+      const warn = parseInt(c.warningDays) || 30;
+      due.setDate(due.getDate() - warn);
+      return dateKey(due);
+    }
+  }
+  if (c.nextDue) return c.nextDue;
+  if (c.lastCompleted) {
+    // Calculate next due from last completed
+    const last = new Date(c.lastCompleted + 'T00:00:00');
+    const days = (parseInt(c.interval)||1) *
+      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7);
+    const next = new Date(last.getTime() + days * 864e5);
+    return dateKey(next);
+  }
+  return dateKey(new Date()); // fallback: today
+}
+
+async function checkAndGenerateOTOs() {
+  if (!rawHealthCriteria.length) return;
+  const allTasks = [...sheetTasks, ...customTasks];
+
+  for (const c of rawHealthCriteria) {
+    const status = evaluateCriterion(c);
+    // Only generate for amber or red — green is healthy, no OTO needed
+    if (status === 'green') continue;
+
+    // Check if an OTO for this criterion already exists
+    const canonicalName = _criterionOTOName(c);
+    const exists = allTasks.some(t => t.name === canonicalName && t.type === 'once');
+    if (exists) continue;
+
+    // Build the OTO task
+    const targetDate = _criterionTargetDate(c);
+    const sectionMap = { vehicle: 'vehicle', home: 'home', finance: 'finance', family: 'family' };
+    const task = {
+      name:       canonicalName,
+      emoji:      '🔔',
+      section:    sectionMap[c.domain] || 'home',
+      freq:       'once',
+      type:       'once',
+      notes:      c.instructions || '',
+      targetDate: targetDate,
+    };
+
+    try {
+      const res  = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'addTask', task })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        console.log('[DOMAINS] OTO generated for:', c.criterion, '→', targetDate);
+      }
+    } catch(err) {
+      console.warn('[DOMAINS] OTO generation failed for:', c.criterion, err);
+    }
+  }
+
+  // Refresh sheet tasks so linked tasks appear immediately
+  await syncFromSheet();
+  if (currentView === 'domains') renderDomains();
 }
 
 async function _seedAndRender(el) {
@@ -5251,7 +5376,7 @@ try {
 syncFromSheet(); // catch-up runs inside after first sync
 restoreIdentityUI(); // restore identity button state
 syncTodayState(); // immediate cross-device state sync on load
-fetchHistory().then(() => { buildWeeklyReport(); if (currentView === 'domains') renderDomains(); });
+fetchHistory().then(() => { buildWeeklyReport(); checkAndGenerateOTOs(); if (currentView === 'domains') renderDomains(); });
 fetchWeather();
 setInterval(syncFromSheet, SYNC_MS);
 setInterval(syncTodayState, 15 * 1000); // sync checked state every 15s
