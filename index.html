@@ -1561,8 +1561,8 @@
   }
   .domain-next-action {
     font-family: 'Outfit', sans-serif;
-    font-size: 8px; font-weight: 600; letter-spacing: 1.5px;
-    color: #333; text-align: right; max-width: 55%;
+    font-size: 9px; font-weight: 600; letter-spacing: 1.2px;
+    color: #555; text-align: right; max-width: 55%;
     line-height: 1.4;
   }
   .domain-next-action span { color: #facc15; }
@@ -1590,7 +1590,7 @@
 
   .criterion-name {
     font-family: 'Outfit', sans-serif;
-    font-size: 11px; font-weight: 500; color: #888;
+    font-size: 11px; font-weight: 500; color: #aaa;
     flex: 1; letter-spacing: 0.2px;
   }
   .criterion-row.green .criterion-name { color: #888; }
@@ -1599,8 +1599,8 @@
 
   .criterion-meta {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 12px; font-weight: 300; font-style: italic;
-    color: #333; text-align: right; line-height: 1.3;
+    font-size: 13px; font-weight: 300; font-style: italic;
+    color: #555; text-align: right; line-height: 1.3;
   }
   .criterion-chevron {
     font-size: 9px; color: #2a2a2a; margin-left: 4px; flex-shrink: 0;
@@ -1618,8 +1618,8 @@
 
   .criterion-detail-status {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 13px; font-weight: 300; font-style: italic;
-    color: rgba(255,255,255,0.3); margin-bottom: 10px;
+    font-size: 14px; font-weight: 300; font-style: italic;
+    color: rgba(255,255,255,0.5); margin-bottom: 10px;
   }
   .criterion-action-btn {
     background: none; border: 1px solid #222; border-radius: 6px;
@@ -1634,7 +1634,7 @@
   .criterion-action-btn.primary:hover { border-color: #4ade80; background: rgba(74,222,128,0.05); }
   .criterion-instructions {
     font-family: 'Outfit', sans-serif;
-    font-size: 10px; color: #333; letter-spacing: 0.3px;
+    font-size: 10px; color: #555; letter-spacing: 0.3px;
     line-height: 1.6; margin-top: 10px;
   }
 
@@ -1642,7 +1642,7 @@
   .criterion-category-label {
     font-family: 'Outfit', sans-serif;
     font-size: 8px; font-weight: 700; letter-spacing: 2.5px;
-    color: #222; padding: 10px 22px 4px;
+    color: #3a3a3a; padding: 12px 22px 4px;
   }
 
   /* Domain health modal */
@@ -4467,19 +4467,19 @@ function renderDomains() {
         detail.className = 'criterion-detail';
 
         const statusLine = status === 'green'
-          ? (c.bookedDate ? `Appointment booked — ${_fmtDate(c.bookedDate)}` : c.lastCompleted ? `Last verified ${_fmtDate(c.lastCompleted)}` : 'Current')
+          ? (c.bookedDate ? `Appointment booked — ${_fmtDate(c.bookedDate)}` : c.lastCompleted ? `Last recorded ${_fmtDate(c.lastCompleted)}` : 'Awaiting first record')
           : status === 'amber' ? 'Needs attention soon'
           : 'Overdue — action required';
 
-        let actionLabel = 'UPDATE STATUS';
+        let actionLabel = 'RECORD STATUS';
         if (c.workflowType === 'two-stage') {
-          actionLabel = c.bookedDate ? 'CONFIRM APPOINTMENT COMPLETE' : 'ENTER BOOKING DATE';
+          actionLabel = c.bookedDate ? 'CONFIRM APPOINTMENT COMPLETE' : 'RECORD BOOKING DATE';
         } else if (c.workflowType === 'recurring-modal') {
-          actionLabel = 'MARK COMPLETE';
+          actionLabel = 'RECORD COMPLETION';
         } else if (c.workflowType === 'simple-date') {
-          actionLabel = 'MARK VERIFIED';
+          actionLabel = 'RECORD RENEWAL DATE';
         } else if (c.workflowType === 'auto-renew-date') {
-          actionLabel = 'CONFIRM RENEWAL';
+          actionLabel = 'CONFIRM AUTO-RENEWAL';
         }
 
         detail.innerHTML = `
