@@ -4964,19 +4964,23 @@ function criterionNextAction(c) {
   const status = evaluateCriterion(c);
 
   if (c.nextDue) {
-    const d   = new Date(c.nextDue + 'T00:00:00');
-    const lbl = MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
-    if (status === 'red')   return 'Overdue — ' + lbl;
-    if (status === 'amber') return 'Action today — due ' + lbl;
-    return 'Next due ' + lbl;
+    const d = new Date(c.nextDue.length === 10 ? c.nextDue + 'T00:00:00' : c.nextDue);
+    if (!isNaN(d.getTime())) {
+      const lbl = MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
+      if (status === 'red')   return 'Overdue - ' + lbl;
+      if (status === 'amber') return 'Action today - due ' + lbl;
+      return 'Next due ' + lbl;
+    }
   }
   if (c.lastCompleted) {
-    const last       = new Date(c.lastCompleted + 'T00:00:00');
-    const intervalMs = (parseInt(c.interval)||1) *
-      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
-    const nextDue    = new Date(last.getTime() + intervalMs);
-    const lbl = MONTHS[nextDue.getMonth()].slice(0,3) + ' ' + nextDue.getDate() + ', ' + nextDue.getFullYear();
-    return 'Next due ' + lbl;
+    const last = new Date(c.lastCompleted.length === 10 ? c.lastCompleted + 'T00:00:00' : c.lastCompleted);
+    if (!isNaN(last.getTime())) {
+      const intervalMs = (parseInt(c.interval)||1) *
+        (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
+      const nextDue = new Date(last.getTime() + intervalMs);
+      const lbl = MONTHS[nextDue.getMonth()].slice(0,3) + ' ' + nextDue.getDate() + ', ' + nextDue.getFullYear();
+      return 'Next due ' + lbl;
+    }
   }
   // No nextDue or lastCompleted — try linked task
   const linked = _criterionLinkedTask(c);
