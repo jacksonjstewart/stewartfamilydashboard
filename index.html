@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>Steward · v0.5</title>
+<title>Steward · v0.6</title>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1823,7 +1823,7 @@
     </div>
   </div>
   <div id="splash-rule"></div>
-  <div id="splash-sub">STEWARD · v0.5</div>
+  <div id="splash-sub">STEWARD · v0.6</div>
 </div>
 
 <!-- ── WEEKLY REPORT ──────────────────────────────────────────────────────── -->
@@ -2144,7 +2144,7 @@
 
     <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">STEWARD · v0.5</div>
+    <div id="version-tag">STEWARD · v0.6</div>
   </div>
   </div>
 
@@ -2709,7 +2709,12 @@ async function syncFromSheet() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const parsed = parseCSV(await res.text());
     if (!parsed.length) throw new Error("empty");
-    sheetTasks = parsed;
+    // Deduplicate by id — protects against duplicate rows in the sheet
+    const seen = new Set();
+    sheetTasks = parsed.filter(t => {
+      if (!t.id || seen.has(t.id)) return false;
+      seen.add(t.id); return true;
+    });
     try { localStorage.setItem("hd_sheet_cache", JSON.stringify(sheetTasks)); } catch(e) {}
     const now = new Date();
     const h = now.getHours() % 12 || 12, m = String(now.getMinutes()).padStart(2,"0");
