@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>Steward · v0.7</title>
+<title>Steward · v0.8</title>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1832,7 +1832,7 @@
     </div>
   </div>
   <div id="splash-rule"></div>
-  <div id="splash-sub">STEWARD · v0.7</div>
+  <div id="splash-sub">STEWARD · v0.8</div>
 </div>
 
 <!-- ── WEEKLY REPORT ──────────────────────────────────────────────────────── -->
@@ -2153,7 +2153,7 @@
 
     <div id="left-footer">
     <div id="checkin-indicator"></div>
-    <div id="version-tag">STEWARD · v0.7</div>
+    <div id="version-tag">STEWARD · v0.8</div>
   </div>
   </div>
 
@@ -3325,20 +3325,25 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
       if (e.target.closest('.task-remove')) return;
 
       // OTO linked to a health criterion that needs date entry — intercept and open date modal
+      console.log('[STEWARD] row click — task.type:', task.type, 'task.id:', task.id, 'task.name:', task.name);
       if (task.type === 'once' && !doneLog[task.id + '_' + todayKey]
           && typeof rawHealthCriteria !== 'undefined'
           && typeof CRITERION_TASKS !== 'undefined') {
+        console.log('[STEWARD] OTO intercept check — rawHealthCriteria.length:', rawHealthCriteria.length);
         let crit = null;
         for (const c of rawHealthCriteria) {
           const def = CRITERION_TASKS[c.id];
           if (!def) continue;
+          console.log('[STEWARD] checking criterion:', c.id, 'def.linkedTaskId:', def.linkedTaskId, 'def.name:', def.name);
           if (def.linkedTaskId === task.id || def.name === task.name) { crit = c; break; }
         }
-        // Use CRITERION_TASKS for workflowType — more reliable than sheet value
+        console.log('[STEWARD] crit found:', crit ? crit.id : 'null');
         if (crit) {
           const def = CRITERION_TASKS[crit.id];
           const wt  = (def && def.workflowType) || crit.workflowType || '';
+          console.log('[STEWARD] workflowType:', wt);
           if (wt === 'simple-date' || wt === 'auto-renew-date') {
+            console.log('[STEWARD] opening date shift modal');
             _openDateShiftModal(crit, task); return;
           }
         }
@@ -4670,6 +4675,7 @@ function _renderDomainsInner(el) {
         // Wire the action button — must be after detail is appended to DOM
         detail.querySelector('.criterion-action-btn').addEventListener('click', (e) => {
           e.stopPropagation();
+          console.log('[STEWARD] domain action btn clicked — criterionId:', c.id);
           _criterionAction(c.id);
         });
 
@@ -5301,8 +5307,10 @@ function _openSubCheckModal(c, linked) {
 
 // Modal for date-sensitive completions — asks for new expiry/next-due date
 function _openDateShiftModal(c, linked) {
+  console.log('[STEWARD] _openDateShiftModal called — c.id:', c.id, 'linked:', linked ? linked.id : 'null');
   const isRenewal = ['veh-license','veh-registration','veh-insurance'].includes(c.id);
   const overlay = document.getElementById('domain-modal-overlay');
+  console.log('[STEWARD] overlay element:', overlay, 'classList:', overlay ? overlay.className : 'NULL');
   document.getElementById('dm-title').textContent    = c.domain.toUpperCase() + ' · ' + c.category.toUpperCase();
   document.getElementById('dm-subtitle').textContent = c.criterion;
 
