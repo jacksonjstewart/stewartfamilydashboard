@@ -4150,53 +4150,60 @@ function evaluateCriterion(c) {
   const now     = new Date();
   const todayDk = dateKey(now);
 
-  // Auto-detect from history (Type A)
+  // Auto-detect from history
   if (c.workflowType === 'auto-detect') {
     const days   = parseInt(c.interval) || 7;
     const cutoff = new Date(now);
     cutoff.setDate(now.getDate() - days);
-    const cutoffDk = dateKey(cutoff);
     const found = rawHistory.some(e =>
-      e.taskId === c.id.replace('auto-', '') || (c.notes && e.name && e.name.toLowerCase().includes((c.notes||'').toLowerCase()))
+      e.taskId === c.id.replace('auto-', '') ||
+      (c.notes && e.name && e.name.toLowerCase().includes((c.notes||'').toLowerCase()))
     );
     return found ? 'green' : 'red';
   }
 
-  // Date-based criteria
-  if (c.nextDue) {
-    const dueDate     = new Date(c.nextDue + 'T00:00:00');
-    const warningDays = parseInt(c.warningDays) || 30;
-    const warnDate    = new Date(dueDate);
-    warnDate.setDate(dueDate.getDate() - warningDays);
-    const dueDk  = dateKey(dueDate);
-    const warnDk = dateKey(warnDate);
+  // ── Core rule: amber = linked task is ACTIVE + INCOMPLETE on today's list ──
+  // This covers GET AHEAD tasks, OTOs due today, and recurring due today.
+  // Everything else is green (healthy / future) or red (genuinely overdue).
+  const linked = _criterionLinkedTask(c);
+  const linkedActiveIncomplete = linked && (() => {
+    const isDone = !!doneLog[linked.id + '_' + todayKey];
+    if (isDone) return false;
+    // OTO targeted today
+    if (linked.type === 'once' && linked.targetDate === todayDk) return true;
+    // GET AHEAD — within lead window and not done
+    if (linked.dueDate) {
+      const d = daysUntilDue(linked);
+      return d !== null && d <= GET_AHEAD_LEAD_DAYS;
+    }
+    // Recurring landing today
+    return isDueOn(linked, new Date(todayDk + 'T00:00:00'));
+  })();
 
-    if (todayDk > dueDk)  return 'red';   // past due
-    if (todayDk >= warnDk) return 'amber'; // within warning window
-    return 'green';
-  }
+  if (linkedActiveIncomplete) return 'amber';
 
-  // Recurring-modal — check lastCompleted
+  // ── Red: genuinely overdue — past due with no completion ──────────────────
+  if (c.nextDue && todayDk > c.nextDue) return 'red';
   if (c.lastCompleted) {
     const last       = new Date(c.lastCompleted + 'T00:00:00');
-    const intervalMs = (parseInt(c.interval)||1) * (c.intervalUnit==='month' ? 30 : c.intervalUnit==='year' ? 365 : 7) * 864e5;
+    const intervalMs = (parseInt(c.interval)||1) *
+      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
     const nextDue    = new Date(last.getTime() + intervalMs);
-    const warn       = new Date(nextDue);
-    warn.setDate(nextDue.getDate() - (parseInt(c.warningDays)||14));
     if (now > nextDue) return 'red';
-    if (now >= warn)   return 'amber';
     return 'green';
   }
 
-  // No lastCompleted — check if linked task gives us a future occurrence
-  // If there's a linked recurring task with a known future date → healthy (green)
-  const linked = _criterionLinkedTask(c);
+  // ── Recurring with no history — green if future occurrence exists ─────────
   if (linked && linked.freq && linked.freq !== 'once') {
     const next = _nextOccurrence(linked);
-    if (next) return 'green'; // future occurrence exists — healthy
+    if (next) return 'green';
   }
-  // No data yet — never completed
-  return c.status || 'amber';
+
+  // ── Date-based with future nextDue — green ────────────────────────────────
+  if (c.nextDue) return 'green';
+
+  // Fallback
+  return c.status === 'green' ? 'green' : 'amber';
 }
 
 // ── Next action text for a criterion ─────────────────────────────────────────
@@ -4501,15 +4508,7 @@ function renderDomains() {
 
         const row = document.createElement('div');
         // Dot color: green always unless linked task is active+incomplete today
-        const _lt = _criterionLinkedTask(c);
-        const _ltActiveToday = _lt && (() => {
-          const isDone = !!doneLog[_lt.id + '_' + todayKey];
-          if (isDone) return false;
-          if (_lt.type === 'once' && _lt.targetDate === todayKey) return true;
-          if (_lt.dueDate) { const d = daysUntilDue(_lt); return d !== null && d <= GET_AHEAD_LEAD_DAYS; }
-          return isDueOn(_lt, new Date(todayKey + 'T00:00:00'));
-        })();
-        const dotColor = _ltActiveToday ? 'amber' : 'green';
+        const dotColor = status; // dot always mirrors criterion status
         row.className = `criterion-row ${status}`;
         row.dataset.id = c.id;
         row.innerHTML = `
@@ -4560,8 +4559,7 @@ function renderDomains() {
           <div class="criterion-detail-status">${statusLine}</div>
           ${linkedHTML}
           ${c.instructions ? `<div class="criterion-instructions">${c.instructions}</div>` : ''}
-          <button class="criterion-action-btn ${_ltActiveToday ? 'primary' : ''}"
-            onclick="_criterionAction('${c.id}')">${actionLabel}</button>`;
+          <button class="criterion-action-btn ${status !== 'green' ? 'primary' : ''}">${actionLabel}</button>`;
 
         row.addEventListener('click', () => {
           const isOpen = detail.classList.contains('open');
