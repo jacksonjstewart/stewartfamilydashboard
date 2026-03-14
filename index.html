@@ -4470,27 +4470,30 @@ function renderDomains() {
 
 function _renderDomainsInner(el) {
 
-  // Seed if empty, or if new domains have no criteria yet
-  // Seed any missing domains — all seeds are idempotent
-  const domainKeys    = ['vehicle','digital','home','finance','family'];
-  const seedActions   = {
+  // If no criteria at all — seed everything first
+  if (!rawHealthCriteria.length) { _seedAndRender(el); return; }
+
+  // Seed missing domains in background — don't block rendering what we have
+  const domainKeys  = ['vehicle','digital','home','finance','family'];
+  const seedActions = {
     vehicle: 'seedVehicleCriteria', digital: 'seedDigitalCriteria',
     home: 'seedHomeCriteria', finance: 'seedFinanceCriteria', family: 'seedFamilyCriteria'
   };
   const missingDomains = domainKeys.filter(k => !rawHealthCriteria.some(c => c.domain === k));
-  if (!rawHealthCriteria.length) { _seedAndRender(el); return; }
   if (missingDomains.length > 0) {
     Promise.all(missingDomains.map(k =>
       fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: seedActions[k] }) })
+        body: JSON.stringify({ action: seedActions[k] }) }).catch(() => {})
     )).then(async () => {
-      const r2 = await fetch(API_URL);
-      const d2 = await r2.json();
-      rawHealthCriteria = Array.isArray(d2.healthCriteria) ? d2.healthCriteria : [];
-      try { const c = JSON.parse(localStorage.getItem('hd_history_cache')||'{}'); c.hc = rawHealthCriteria; localStorage.setItem('hd_history_cache', JSON.stringify(c)); } catch(e) {}
-      renderDomains();
-    }).catch(() => {});
-    return;
+      try {
+        const r2 = await fetch(API_URL);
+        const d2 = await r2.json();
+        rawHealthCriteria = Array.isArray(d2.healthCriteria) ? d2.healthCriteria : rawHealthCriteria;
+        try { const c = JSON.parse(localStorage.getItem('hd_history_cache')||'{}'); c.hc = rawHealthCriteria; localStorage.setItem('hd_history_cache', JSON.stringify(c)); } catch(e) {}
+        renderDomains();
+      } catch(e) { /* silent */ }
+    });
+    // Fall through — render what we have right now
   }
 
 
