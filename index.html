@@ -4146,104 +4146,6 @@ const DOMAIN_DEFS = [
 ];
 
 // ── Criterion status evaluation ────────────────────────────────────────────────
-function evaluateCriterion(c) {
-  const now     = new Date();
-  const todayDk = dateKey(now);
-  const linked  = _criterionLinkedTask(c);
-
-  // ── Check if linked task is active on today's list and incomplete ──────────
-  const activeToday = linked && (() => {
-    const isDone = !!doneLog[linked.id + '_' + todayKey];
-    if (isDone) return false;
-    if (linked.type === 'once' && linked.targetDate === todayDk) return true;
-    if (linked.dueDate) {
-      const d = daysUntilDue(linked);
-      return d !== null && d <= GET_AHEAD_LEAD_DAYS;
-    }
-    return isDueOn(linked, new Date(todayDk + 'T00:00:00'));
-  })();
-
-  if (activeToday) return 'amber';
-
-  // ── Red: genuinely overdue with no completion ─────────────────────────────
-  if (c.nextDue && todayDk > c.nextDue) return 'red';
-  if (c.lastCompleted) {
-    const last       = new Date(c.lastCompleted + 'T00:00:00');
-    const intervalMs = (parseInt(c.interval)||1) *
-      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
-    if (now > new Date(last.getTime() + intervalMs)) return 'red';
-  }
-
-  // ── Everything else is green: future OTO, future recurring, future nextDue ─
-  // "Pending/booked action item in the future" = healthy
-  return 'green';
-}
-
-// ── Next action text for a criterion ─────────────────────────────────────────
-function criterionNextAction(c) {
-  const status = evaluateCriterion(c);
-
-  if (c.nextDue) {
-    const d   = new Date(c.nextDue + 'T00:00:00');
-    const lbl = MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
-    if (status === 'red')   return 'Overdue — ' + lbl;
-    if (status === 'amber') return 'Action today — due ' + lbl;
-    return 'Next due ' + lbl;
-  }
-  if (c.lastCompleted) {
-    const last       = new Date(c.lastCompleted + 'T00:00:00');
-    const intervalMs = (parseInt(c.interval)||1) *
-      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
-    const nextDue    = new Date(last.getTime() + intervalMs);
-    const lbl = MONTHS[nextDue.getMonth()].slice(0,3) + ' ' + nextDue.getDate() + ', ' + nextDue.getFullYear();
-    return 'Next due ' + lbl;
-  }
-  // No nextDue or lastCompleted — try linked task
-  const linked = _criterionLinkedTask(c);
-  if (linked) {
-    if (linked.type === 'once' && linked.targetDate) {
-      return 'Scheduled ' + _fmtDate(linked.targetDate);
-    }
-    const next = _nextOccurrence(linked);
-    if (next) return 'Next ' + _fmtDate(next);
-  }
-  return null;
-}
-
-// ── Domain overall health score + word ────────────────────────────────────────
-function domainHealth(domainKey) {
-  const criteria = rawHealthCriteria.filter(c => c.domain === domainKey);
-  if (!criteria.length) return { pct: null, word: 'No criteria', color: 'amber', nextAction: null, nextCriterion: null };
-
-  const statuses = criteria.map(evaluateCriterion);
-  const greens   = statuses.filter(s => s === 'green').length;
-  const reds     = statuses.filter(s => s === 'red').length;
-  // Score: only greens count. Amber = 0, Red = 0.
-  const pct = Math.round(greens / criteria.length * 100);
-
-  let color = 'green', word = 'Completely healthy';
-  if (pct === 100)     { color = 'green'; word = 'Completely healthy'; }
-  else if (pct >= 25)  { color = 'amber'; word = 'Action required'; }
-  else                 { color = 'red';   word = 'Needs attention'; }
-
-  // Next upcoming action — soonest criterion needing attention
-  const upcoming = criteria
-    .map(c => ({ c, action: criterionNextAction(c), status: evaluateCriterion(c) }))
-    .filter(x => x.action)
-    .sort((a, b) => {
-      const ad = a.c.nextDue || a.c.lastCompleted || '9999';
-      const bd = b.c.nextDue || b.c.lastCompleted || '9999';
-      return ad.localeCompare(bd);
-    })[0];
-
-  return {
-    pct, color, word,
-    nextAction:    upcoming ? upcoming.action     : null,
-    nextCriterion: upcoming ? upcoming.c.criterion : null,
-  };
-}
-
-
 // ── Render domain modal for criterion action ──────────────────────────────────
 let _dmCriterion = null;
 let _dmSubState  = {};
@@ -4704,6 +4606,107 @@ function _linkedTaskStatus(task) {
 }
 
 // Next calendar date a recurring task will fire (searches up to 400 days ahead)
+
+// ── CRITERION EVALUATION (defined here, after CRITERION_TASKS & helpers) ────────
+function evaluateCriterion(c) {
+  const now     = new Date();
+  const todayDk = dateKey(now);
+  const linked  = _criterionLinkedTask(c);
+
+  // ── Check if linked task is active on today's list and incomplete ──────────
+  const activeToday = linked && (() => {
+    const isDone = !!doneLog[linked.id + '_' + todayKey];
+    if (isDone) return false;
+    if (linked.type === 'once' && linked.targetDate === todayDk) return true;
+    if (linked.dueDate) {
+      const d = daysUntilDue(linked);
+      return d !== null && d <= GET_AHEAD_LEAD_DAYS;
+    }
+    return isDueOn(linked, new Date(todayDk + 'T00:00:00'));
+  })();
+
+  if (activeToday) return 'amber';
+
+  // ── Red: genuinely overdue with no completion ─────────────────────────────
+  if (c.nextDue && todayDk > c.nextDue) return 'red';
+  if (c.lastCompleted) {
+    const last       = new Date(c.lastCompleted + 'T00:00:00');
+    const intervalMs = (parseInt(c.interval)||1) *
+      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
+    if (now > new Date(last.getTime() + intervalMs)) return 'red';
+  }
+
+  // ── Everything else is green: future OTO, future recurring, future nextDue ─
+  // "Pending/booked action item in the future" = healthy
+  return 'green';
+}
+
+// ── Next action text for a criterion ─────────────────────────────────────────
+function criterionNextAction(c) {
+  const status = evaluateCriterion(c);
+
+  if (c.nextDue) {
+    const d   = new Date(c.nextDue + 'T00:00:00');
+    const lbl = MONTHS[d.getMonth()].slice(0,3) + ' ' + d.getDate() + ', ' + d.getFullYear();
+    if (status === 'red')   return 'Overdue — ' + lbl;
+    if (status === 'amber') return 'Action today — due ' + lbl;
+    return 'Next due ' + lbl;
+  }
+  if (c.lastCompleted) {
+    const last       = new Date(c.lastCompleted + 'T00:00:00');
+    const intervalMs = (parseInt(c.interval)||1) *
+      (c.intervalUnit === 'month' ? 30 : c.intervalUnit === 'year' ? 365 : 7) * 864e5;
+    const nextDue    = new Date(last.getTime() + intervalMs);
+    const lbl = MONTHS[nextDue.getMonth()].slice(0,3) + ' ' + nextDue.getDate() + ', ' + nextDue.getFullYear();
+    return 'Next due ' + lbl;
+  }
+  // No nextDue or lastCompleted — try linked task
+  const linked = _criterionLinkedTask(c);
+  if (linked) {
+    if (linked.type === 'once' && linked.targetDate) {
+      return 'Scheduled ' + _fmtDate(linked.targetDate);
+    }
+    const next = _nextOccurrence(linked);
+    if (next) return 'Next ' + _fmtDate(next);
+  }
+  return null;
+}
+
+// ── Domain overall health score + word ────────────────────────────────────────
+function domainHealth(domainKey) {
+  const criteria = rawHealthCriteria.filter(c => c.domain === domainKey);
+  if (!criteria.length) return { pct: null, word: 'No criteria', color: 'amber', nextAction: null, nextCriterion: null };
+
+  const statuses = criteria.map(evaluateCriterion);
+  const greens   = statuses.filter(s => s === 'green').length;
+  const reds     = statuses.filter(s => s === 'red').length;
+  // Score: only greens count. Amber = 0, Red = 0.
+  const pct = Math.round(greens / criteria.length * 100);
+
+  let color = 'green', word = 'Completely healthy';
+  if (pct === 100)     { color = 'green'; word = 'Completely healthy'; }
+  else if (pct >= 25)  { color = 'amber'; word = 'Action required'; }
+  else                 { color = 'red';   word = 'Needs attention'; }
+
+  // Next upcoming action — soonest criterion needing attention
+  const upcoming = criteria
+    .map(c => ({ c, action: criterionNextAction(c), status: evaluateCriterion(c) }))
+    .filter(x => x.action)
+    .sort((a, b) => {
+      const ad = a.c.nextDue || a.c.lastCompleted || '9999';
+      const bd = b.c.nextDue || b.c.lastCompleted || '9999';
+      return ad.localeCompare(bd);
+    })[0];
+
+  return {
+    pct, color, word,
+    nextAction:    upcoming ? upcoming.action     : null,
+    nextCriterion: upcoming ? upcoming.c.criterion : null,
+  };
+}
+
+
+
 function _nextOccurrence(task) {
   const start = new Date(todayKey + 'T00:00:00');
   for (let i = 0; i <= 400; i++) {
