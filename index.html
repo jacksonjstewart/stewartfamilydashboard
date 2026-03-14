@@ -4501,20 +4501,15 @@ const CRITERION_TASKS = {
   'veh-registration': {
     linkedTaskId: null,
     name: 'Renew vehicle registration',
-    emoji: '📋', freq: 'once', type: 'once',
-    getTargetDate: (c) => c.nextDue || dateKey(new Date()),
+    emoji: '📋', freq: 'yearly', type: '',
+    dueDate: '08-01', yearMonth: 8, dotm: 1,
     notes: 'Renew at any Alberta registry agent. Bring current registration and insurance.',
   },
   'veh-insurance': {
     linkedTaskId: null,
     name: 'Confirm insurance auto-renewal',
-    emoji: '🛡️', freq: 'once', type: 'once',
-    getTargetDate: (c) => {
-      if (!c.nextDue) return dateKey(new Date());
-      const d = new Date(c.nextDue + 'T00:00:00');
-      d.setDate(d.getDate() - 14);
-      return dateKey(d);
-    },
+    emoji: '🛡️', freq: 'yearly', type: '',
+    dueDate: '06-12', yearMonth: 6, dotm: 12,
     notes: 'Verify auto-renewal confirmation received from Belair/Johnson. Confirm payment processed.',
   },
   'veh-oil-change': {
@@ -4754,9 +4749,13 @@ async function checkAndGenerateOTOs() {
       notes:   def.notes || '',
     };
 
-    // OTO gets a targetDate; recurring gets frequency fields
+    // OTO gets a targetDate; yearly recurring gets dueDate+yearMonth+dotm; biweekly gets anchorDate
     if (def.type === 'once') {
       task.targetDate = def.getTargetDate(c);
+    } else if (def.freq === 'yearly') {
+      task.dueDate   = def.dueDate;    // MM-DD — isGetAheadTask reads this
+      task.yearMonth = def.yearMonth;
+      task.dotm      = def.dotm;
     } else if (def.freq === 'biweekly') {
       // biweekly: next occurrence of the given dow
       task.dow = def.dow !== undefined ? def.dow : 1;
