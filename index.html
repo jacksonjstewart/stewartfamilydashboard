@@ -3326,12 +3326,15 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
 
       // OTO linked to a health criterion that needs date entry — intercept and open date modal
       if (task.type === 'once' && !doneLog[task.id + '_' + todayKey]
-          && typeof rawHealthCriteria !== 'undefined') {
-        const crit = rawHealthCriteria.find(c => {
-          // Use _criterionLinkedTask for robust matching (handles id, name, [HEALTH] fallback)
-          const linked = _criterionLinkedTask(c);
-          return linked && linked.id === task.id;
-        });
+          && typeof rawHealthCriteria !== 'undefined'
+          && typeof CRITERION_TASKS !== 'undefined') {
+        // Find criterion: check linkedTaskId match first (most reliable), then name
+        let crit = null;
+        for (const c of rawHealthCriteria) {
+          const def = CRITERION_TASKS[c.id];
+          if (!def) continue;
+          if (def.linkedTaskId === task.id || def.name === task.name) { crit = c; break; }
+        }
         // Only intercept if criterion requires date input
         if (crit && (crit.workflowType === 'simple-date' || crit.workflowType === 'auto-renew-date')) {
           _openDateShiftModal(crit, task); return;
@@ -4659,6 +4662,12 @@ function _renderDomainsInner(el) {
             detail.classList.add('open');
             row.classList.add('expanded');
           }
+        });
+
+        // Wire the action button — must be after detail is appended to DOM
+        detail.querySelector('.criterion-action-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          _criterionAction(c.id);
         });
 
         criteriaEl.appendChild(row);
