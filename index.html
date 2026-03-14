@@ -3323,6 +3323,18 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
       }
       if (e.target.closest('.task-chevron')) { wrap.classList.toggle('open'); return; }
       if (e.target.closest('.task-remove')) return;
+
+      // Hard-deadline OTO linked to a health criterion — intercept and open date modal
+      if (task.hardDeadline && task.type === 'once' && !doneLog[task.id + '_' + todayKey]) {
+        const crit = typeof rawHealthCriteria !== 'undefined'
+          ? rawHealthCriteria.find(c => {
+              const def = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
+              return def && (def.linkedTaskId === task.id || def.name === task.name);
+            })
+          : null;
+        if (crit) { _openDateShiftModal(crit, task); return; }
+      }
+
       toggleTask(task.id);
     });
   } else {
@@ -5343,9 +5355,10 @@ function _openDateShiftModal(c, linked) {
     }
 
     // Regenerate a new future OTO for this criterion at the correct future date
-    // (checkAndGenerateOTOs will handle this on next load since old task is gone)
+    await checkAndGenerateOTOs();
     closeDomainModal();
-    renderDomains();
+    render();
+    if (currentView === 'domains') renderDomains();
   };
 
   overlay.classList.add('open');
