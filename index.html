@@ -3198,17 +3198,14 @@ ${task.section === 'digital' ? '**For your devices**\nPixel 9A, Dell XPS 13, or 
 Keep the total response under 200 words. No fluff.`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // Route through Apps Script proxy to avoid CORS/key issues from GitHub Pages
+    const res = await fetch(API_URL + '?action=aiGuide', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'aiGuide', taskName: task.name, taskFreq: freqStr, taskSection: task.section, taskNotes: task.notes || '' })
     });
     const data = await res.json();
-    const text = data.content?.map(b => b.text || '').join('') || 'Unable to generate guide.';
+    const text = (data.guide) || (data.ok === false ? 'API error.' : 'Unable to generate guide.');
 
     // Render markdown-ish response
     const boldify = s => s
@@ -5274,32 +5271,28 @@ function _openDateShiftModal(c, linked) {
 
 async function _seedAndRender(el) {
   el.innerHTML = '<div class="domains-empty">Setting up health criteria…</div>';
+  // Each seed is idempotent — fire and forget, don't let failures block the load
+  const _seeds = ['seedVehicleCriteria','seedDigitalCriteria','seedHomeCriteria','seedFinanceCriteria','seedFamilyCriteria'];
+  for (const action of _seeds) {
+    try {
+      await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action }) });
+    } catch(e) { console.warn('[STEWARD] Seed skipped:', action, e.message); }
+  }
+  // Always attempt to load — even if some seeds failed
   try {
-    // Seed all domains — each seed is idempotent (skips existing rows)
-    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'seedVehicleCriteria' }) });
-    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'seedDigitalCriteria' }) });
-    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'seedHomeCriteria' }) });
-    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'seedFinanceCriteria' }) });
-    await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'seedFamilyCriteria' }) });
-    {
-      // Reload health criteria from sheet
-      const res2  = await fetch(API_URL);
-      const data2 = await res2.json();
-      rawHealthCriteria = Array.isArray(data2.healthCriteria) ? data2.healthCriteria : [];
-      try {
-        const c = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
-        c.hc = rawHealthCriteria;
-        localStorage.setItem('hd_history_cache', JSON.stringify(c));
-      } catch(e) {}
-      renderDomains();
-    }
+    const res2  = await fetch(API_URL);
+    const data2 = await res2.json();
+    rawHealthCriteria = Array.isArray(data2.healthCriteria) ? data2.healthCriteria : [];
+    try {
+      const c = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
+      c.hc = rawHealthCriteria;
+      localStorage.setItem('hd_history_cache', JSON.stringify(c));
+    } catch(e) {}
+    renderDomains();
   } catch(err) {
-    el.innerHTML = '<div class="domains-empty">Could not load health criteria. Check connection.</div>';
+    el.innerHTML = '<div class="domains-empty">Could not load health criteria. Check connection and try again.</div>';
+    console.error('[STEWARD] fetchHistory failed in _seedAndRender:', err);
   }
 }
 
