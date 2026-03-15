@@ -4828,10 +4828,28 @@ const CRITERION_TASKS = {
   },
   'veh-insurance': {
     linkedTaskId: null,
-    name: 'Confirm insurance auto-renewal',
-    emoji: '🛡️', freq: 'yearly', type: '',
-    dueDate: '06-12', yearMonth: 6, dotm: 12,
-    notes: 'Verify auto-renewal confirmation received from Belair/Johnson. Confirm payment processed.',
+    permanentId:  'veh-insurance-check',
+    name: 'Confirm auto-renewal & verify insurance docs',
+    emoji: '🛡️', freq: 'once', type: 'once',
+    workflowType: 'sub-check',
+    dueDate: '07-01',
+    getTargetDate: (c) => {
+      // Always target June 1 of the relevant year (30 days before Jul 1)
+      if (!c.nextDue) return dateKey(new Date());
+      const ms = Date.UTC(
+        parseInt(c.nextDue.slice(0,4)),
+        parseInt(c.nextDue.slice(5,7)) - 1,
+        parseInt(c.nextDue.slice(8,10))
+      ) - 30 * 864e5;
+      return dateKey(new Date(ms));
+    },
+    getDueDate: (c) => c.nextDue ? c.nextDue.slice(5) : '07-01',
+    subChecks: JSON.stringify([
+      { id: 'ins-app',      label: 'Insurance policy is current on my phone app (not expired)' },
+      { id: 'ins-physical', label: 'Physical copy of insurance is in the glove box' },
+      { id: 'ins-coverage', label: 'Coverage amount and deductible are still appropriate' },
+    ]),
+    notes: 'Auto-renews annually. Confirm all three items each year.',
   },
   'veh-oil-change': {
     linkedTaskId: null,
@@ -5417,8 +5435,47 @@ function _openSubCheckModal(c, linked) {
   btn.parentNode.replaceChild(newBtn, btn);
 
   newBtn.textContent = 'CONFIRM COMPLETE';
+  newBtn.disabled = true;
+  newBtn.style.opacity = '0.35';
+
+  // Gate CONFIRM — all checks must be ticked
+  function _updateConfirmGate() {
+    const allChecked = checks.every(chk => !!_dmSubState[chk.id]);
+    newBtn.disabled     = !allChecked;
+    newBtn.style.opacity = allChecked ? '1' : '0.35';
+  }
+  // Re-evaluate gate on every check toggle — patch _renderSubChecks click handlers
+  body.querySelectorAll('.dm-check-row').forEach(row => {
+    row.addEventListener('click', () => setTimeout(_updateConfirmGate, 0));
+  });
+
   newBtn.onclick = async () => {
-    // Mark linked task done for today
+    const checks2 = (() => { try { return JSON.parse(c.subChecks); } catch(e) { return []; } })();
+    if (!checks2.every(chk => !!_dmSubState[chk.id])) return; // guard
+
+    // Compute nextDue — always next July 1
+    const now   = new Date();
+    const year  = now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear();
+    const newNextDue = year + '-07-01';
+    const def        = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
+    const newTargetDate = def && def.getTargetDate
+      ? def.getTargetDate({ ...c, nextDue: newNextDue }) : null;
+    const newDueDate = '07-01';
+
+    // Capture originals before mutation
+    const originalNextDue       = c.nextDue;
+    const originalLastCompleted = c.lastCompleted || '';
+
+    // Update criterion in memory only
+    const ci = rawHealthCriteria.findIndex(r => r.id === c.id);
+    if (ci >= 0) rawHealthCriteria[ci] = { ...c, lastCompleted: todayKey, nextDue: newNextDue, bookedDate: '' };
+    try {
+      const _ch = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
+      _ch.hc = rawHealthCriteria;
+      localStorage.setItem('hd_history_cache', JSON.stringify(_ch));
+    } catch(e) {}
+
+    // Mark linked task done for today (non-permanent until midnight)
     if (linked) {
       const key = linked.id + '_' + todayKey;
       if (!doneLog[key]) {
@@ -5426,14 +5483,31 @@ function _openSubCheckModal(c, linked) {
         doneLog[key] = { ts, who: currentIdentity };
         _localOrigin.add(key);
         saveDone(doneLog);
-        renderInPlace();
         writeCheckToSheet(linked.id, ts);
       }
+      // Store pending renewal — midnight commit writes to sheets
+      _storePendingRenewal({
+        taskId:             linked.id,
+        criterionId:        c.id,
+        completedDate:      todayKey,
+        newNextDue,
+        newTargetDate,
+        newDueDate,
+        originalNextDue,
+        originalLastCompleted,
+        originalTargetDate: linked.targetDate || null,
+        originalDueDate:    linked.dueDate    || null,
+      });
+      // Update task in memory only
+      const lt = sheetTasks.find(t => t.id === linked.id);
+      if (lt) {
+        if (newTargetDate) lt.targetDate = newTargetDate;
+        lt.dueDate = newDueDate;
+      }
     }
-    // Update criterion lastCompleted → goes green
-    const updated = { ...c, lastCompleted: todayKey };
-    await _saveAndRefresh(updated);
     closeDomainModal();
+    render();
+    renderDomains();
   };
 
   overlay.classList.add('open');
@@ -5443,7 +5517,7 @@ function _openSubCheckModal(c, linked) {
 
 // Modal for date-sensitive completions — asks for new expiry/next-due date
 function _openDateShiftModal(c, linked) {
-  const isRenewal = ['veh-license','veh-registration','veh-insurance'].includes(c.id);
+  const isRenewal = ['veh-license','veh-registration'].includes(c.id);
   const overlay = document.getElementById('domain-modal-overlay');
   document.getElementById('dm-title').textContent    = c.domain.toUpperCase() + ' · ' + c.category.toUpperCase();
   document.getElementById('dm-subtitle').textContent = c.criterion;
