@@ -2458,7 +2458,15 @@ function isDueToday(task, d) {
     // Always show a completed OTO task
     if (doneLog[task.id + '_' + dk]) return true;
 
-    if (!task.targetDate) return true; // no target date — show daily until done
+    if (!task.targetDate) {
+      // OTO with no targetDate — only show if not a "pending scheduling" chain task
+      // Chain tasks (like veh-oil-do) have empty targetDate until item #1 is booked
+      const _def = typeof CRITERION_TASKS !== 'undefined'
+        ? Object.values(CRITERION_TASKS).find(d => d.name === task.name || d.permanentId === task.id)
+        : null;
+      if (_def && _def.getTargetDate) return false; // managed task, wait for targetDate
+      return true; // unmanaged OTO — show daily until done
+    }
 
     // Push-forward overrides
     if (pushForwardList.includes(task.id)) return true;
