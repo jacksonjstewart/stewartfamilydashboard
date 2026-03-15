@@ -1657,100 +1657,102 @@
   /* Domain health modal */
   #domain-modal-overlay {
     display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.75); z-index: 200;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    align-items: flex-end; justify-content: center;
+    background: rgba(0,0,0,0.82); z-index: 200;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    align-items: center; justify-content: center; padding: 20px;
   }
   #domain-modal-overlay.open { display: flex; }
   #domain-modal {
-    background: #111; border: 1px solid #1e1e1e;
-    border-radius: 20px 20px 0 0; width: 100%; max-width: 700px;
-    padding: 28px 28px 40px; max-height: 85vh; overflow-y: auto;
-    animation: slideUp 0.3s cubic-bezier(0.4,0,0.2,1);
-    position: relative; overflow: hidden;
+    background: #141414; border: 1px solid #252525;
+    border-radius: 20px; width: 100%; max-width: 560px;
+    padding: 36px 36px 32px; max-height: 88vh; overflow-y: auto;
+    animation: slideUp 0.25s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
   }
   #domain-modal::before {
     content: ''; position: absolute; inset: 0; pointer-events: none;
-    opacity: 0.035;
+    border-radius: 20px; opacity: 0.03;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23noise)'/%3E%3C/svg%3E");
   }
   #domain-modal > * { position: relative; z-index: 1; }
-  #dm-header { margin-bottom: 20px; }
+  #dm-header { margin-bottom: 24px; }
   #dm-title {
     font-family: 'Outfit', sans-serif;
     font-size: 10px; font-weight: 700; letter-spacing: 3px;
-    color: rgba(255,255,255,0.4); margin-bottom: 6px;
+    color: rgba(255,255,255,0.3); margin-bottom: 8px;
   }
   #dm-subtitle {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 20px; font-weight: 300;
-    color: #e8e8e8; letter-spacing: -0.3px;
+    font-size: 26px; font-weight: 300;
+    color: #f0f0f0; letter-spacing: -0.3px; line-height: 1.2;
   }
-  #dm-body { margin-bottom: 24px; }
-  .dm-field { margin-bottom: 18px; }
+  #dm-body { margin-bottom: 28px; }
+  .dm-field { margin-bottom: 20px; }
   .dm-field-label {
     font-family: 'Outfit', sans-serif;
-    font-size: 9px; font-weight: 600; letter-spacing: 2px;
-    color: #444; margin-bottom: 8px;
+    font-size: 10px; font-weight: 600; letter-spacing: 2px;
+    color: #555; margin-bottom: 10px;
   }
   .dm-date-input {
-    background: #0c0c0c; border: 1px solid #252525;
-    border-radius: 8px; padding: 10px 14px;
-    font-family: 'Outfit', sans-serif; font-size: 13px;
+    background: #0e0e0e; border: 1px solid #2a2a2a;
+    border-radius: 10px; padding: 12px 16px;
+    font-family: 'Outfit', sans-serif; font-size: 14px;
     color: #e8e8e8; width: 100%; box-sizing: border-box;
     outline: none; transition: border-color 0.2s;
   }
-  .dm-date-input:focus { border-color: #444; }
-  .dm-checklist { display: flex; flex-direction: column; gap: 2px; }
+  .dm-date-input:focus { border-color: #555; }
+  .dm-checklist { display: flex; flex-direction: column; gap: 6px; }
   .dm-check-row {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 12px; border-radius: 8px;
-    background: #0c0c0c; border: 1px solid #141414;
-    cursor: pointer; transition: border-color 0.15s;
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 16px; border-radius: 12px;
+    background: #0e0e0e; border: 1px solid #1e1e1e;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
     -webkit-tap-highlight-color: transparent;
   }
-  .dm-check-row:hover { border-color: #222; }
-  .dm-check-row.checked { border-color: rgba(74,222,128,0.2); background: rgba(74,222,128,0.03); }
+  .dm-check-row:hover { border-color: #2a2a2a; background: #111; }
+  .dm-check-row.checked { border-color: rgba(74,222,128,0.25); background: rgba(74,222,128,0.04); }
   .dm-check-box {
-    width: 18px; height: 18px; border-radius: 5px;
+    width: 24px; height: 24px; border-radius: 7px;
     border: 1px solid #2a2a2a; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.15s;
   }
   .dm-check-row.checked .dm-check-box {
-    background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.4);
+    background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.5);
   }
-  .dm-check-tick { color: #4ade80; font-size: 10px; display: none; }
+  .dm-check-tick { color: #4ade80; font-size: 13px; display: none; }
   .dm-check-row.checked .dm-check-tick { display: block; }
   .dm-check-label {
     font-family: 'Outfit', sans-serif;
-    font-size: 11px; font-weight: 500; color: #888; flex: 1;
+    font-size: 13px; font-weight: 400; color: #aaa; flex: 1; line-height: 1.4;
   }
+  .dm-check-row.checked .dm-check-label { color: #ccc; }
   .dm-check-help {
-    font-size: 9px; color: #333; letter-spacing: 0; line-height: 1.5;
-    margin-top: 4px; padding: 0 12px 8px 42px; display: none;
+    font-size: 10px; color: #444; letter-spacing: 0; line-height: 1.5;
+    margin-top: 4px; padding: 0 16px 10px 56px; display: none;
   }
   .dm-check-row.expanded + .dm-check-help { display: block; }
   #dm-footer {
     display: flex; justify-content: space-between; align-items: center;
-    padding-top: 16px; border-top: 1px solid #1a1a1a;
+    padding-top: 20px; border-top: 1px solid #1e1e1e;
   }
   #dm-cancel {
     background: none; border: none; cursor: pointer;
-    font-family: 'Outfit', sans-serif; font-size: 9px;
+    font-family: 'Outfit', sans-serif; font-size: 10px;
     font-weight: 600; letter-spacing: 2px; color: #333;
-    padding: 8px 0; transition: color 0.2s;
+    padding: 10px 0; transition: color 0.2s;
   }
-  #dm-cancel:hover { color: #555; }
+  #dm-cancel:hover { color: #666; }
   #dm-confirm {
-    background: none; border: 1px solid #252525;
-    border-radius: 6px; cursor: pointer;
-    font-family: 'Outfit', sans-serif; font-size: 9px;
-    font-weight: 700; letter-spacing: 4px; color: rgba(255,255,255,0.4);
-    padding: 10px 24px; transition: all 0.2s;
+    background: none; border: 1px solid #2a2a2a;
+    border-radius: 8px; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 10px;
+    font-weight: 700; letter-spacing: 3px; color: rgba(255,255,255,0.35);
+    padding: 13px 32px; transition: all 0.2s;
   }
-  #dm-confirm:hover { border-color: #4ade80; color: #4ade80; }
+  #dm-confirm:not(:disabled):hover { border-color: #4ade80; color: #4ade80; }
   #dm-confirm:active { transform: scale(0.97); }
+  #dm-confirm:disabled { cursor: not-allowed; }
 
   /* Linked task row in criterion detail */
   .criterion-linked-task {
