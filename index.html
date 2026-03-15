@@ -4785,7 +4785,7 @@ const CRITERION_TASKS = {
     linkedTaskId: null,
     permanentId: 'veh-license-renewal',
     name: "Renew driver's license",
-    emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true, workflowType: 'simple-date',
+    emoji: '🪪', freq: 'once', type: 'once', hardDeadline: true, workflowType: 'simple-date', validated: true,
     getTargetDate: (c) => {
       if (!c.nextDue) return dateKey(new Date());
       // Use UTC to avoid timezone offset shifting the date by one day
