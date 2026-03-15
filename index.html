@@ -2442,13 +2442,12 @@ function isGetAheadTask(task) {
 
 function getAheadLabel(task) {
   var days = daysUntilDue(task);
-  if (days === null) return '';
+  if (days === null) return 'GET AHEAD';
   if (days < 0)  return 'OVERDUE';
   if (days === 0) return 'DUE TODAY';
   if (days === 1) return '1 DAY LEFT';
   if (days <= 7)  return days + ' DAYS LEFT';
-  if (days <= 14) return '2 WEEKS';
-  return 'GET AHEAD';
+  return 'GET AHEAD · ' + days + 'd';
 }
 
 function isDueToday(task, d) {
@@ -3316,7 +3315,16 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
     <span class="task-emoji">${task.emoji}</span>
     <div style="flex:1">
       <div class="task-name">${isCarried ? '<span class="carry-dot"></span>' : ''}${task.name}</div>
-      <div class="task-freq">${isOverdue ? 'Due yesterday · overdue' : (stampText || freqLabel(task))}</div>
+      <div class="task-freq">${isOverdue ? 'Due yesterday · overdue' : (stampText || (() => {
+        // GET AHEAD OTO: show actual deadline date, not 'One time only'
+        if (aheadBadgeText && (task.type === 'once' || task.freq === 'once') && task.dueDate) {
+          const now  = new Date(todayKey + 'T00:00:00');
+          const year = now.getFullYear();
+          const due  = parseDueDate(task.dueDate, year) || parseDueDate(task.dueDate, year+1);
+          if (due) return 'Due ' + _fmtDate(dateKey(due));
+        }
+        return freqLabel(task);
+      })())}</div>
     </div>
     ${pillHTML}${aheadBadgeHTML}
     ${isOverdue ? '<span class="overdue-badge">OVERDUE</span>' : ''}
