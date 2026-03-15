@@ -3001,6 +3001,31 @@ function formatStamp(isoString, who) {
   return who && who !== 'The Stewart Family' ? base + ' by ' + who : base;
 }
 
+
+// ─── PENDING RENEWALS ─────────────────────────────────────────────────────────
+// Stores renewal data in localStorage until midnight commit writes it to sheets.
+// Supports uncheck/undo — cleared if task is unchecked before midnight.
+
+function _storePendingRenewal(data) {
+  try {
+    const pending = JSON.parse(localStorage.getItem('hd_pending_renewals') || '{}');
+    pending[data.taskId] = data;
+    localStorage.setItem('hd_pending_renewals', JSON.stringify(pending));
+  } catch(e) {}
+}
+
+function _clearPendingRenewal(taskId) {
+  try {
+    const pending = JSON.parse(localStorage.getItem('hd_pending_renewals') || '{}');
+    delete pending[taskId];
+    localStorage.setItem('hd_pending_renewals', JSON.stringify(pending));
+  } catch(e) {}
+}
+
+function _getPendingRenewals() {
+  try { return JSON.parse(localStorage.getItem('hd_pending_renewals') || '{}'); }
+  catch(e) { return {}; }
+}
 // ─── 11:59 PM COMMIT ─────────────────────────────────────────────────────────
 function checkMidnightCommit() {
   const now = new Date();
@@ -3096,6 +3121,36 @@ async function performCommit(_dateKey) {  // _dateKey unused — todayKey is glo
       body: JSON.stringify({ action: "clearToday", dateKey: todayKey })
     });
   } catch(err) { console.warn("clearToday failed:", err); }
+
+  // Flush any pending renewals for tasks committed today
+  const _pendingR = _getPendingRenewals();
+  for (const taskId of Object.keys(_pendingR)) {
+    const pr = _pendingR[taskId];
+    // Only flush if this task was actually committed today
+    if (entries.some(e => e.taskId === taskId)) {
+      try {
+        // Write new nextDue + lastCompleted to HealthCriteria
+        const crit = rawHealthCriteria.find(r => r.id === pr.criterionId);
+        if (crit) {
+          await fetch(API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'saveHealthCriterion',
+              criterion: { ...crit, lastCompleted: todayKey, nextDue: pr.newNextDue, bookedDate: '' } })
+          });
+        }
+        // Recycle DESIGN row with new targetDate
+        if (pr.newTargetDate) {
+          await fetch(API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'updateTask', taskId,
+              fields: { targetdate: pr.newTargetDate,
+                        ...(pr.newDueDate ? { duedate: pr.newDueDate } : {}) } })
+          });
+        }
+        _clearPendingRenewal(taskId);
+      } catch(e) { console.warn('Pending renewal flush failed:', taskId, e); }
+    }
+  }
 
   // Push-forward: recurring tasks + OTO tasks with pushforward=yes
   const newPushFwd = [];
@@ -5311,7 +5366,7 @@ async function _criterionAction(criterionId) {
       renderInPlace();
       writeCheckToSheet(linked.id, ts);
       const updated = { ...c, lastCompleted: todayKey };
-      await _saveAndRefresh(updated);
+      // _saveAndRefresh deferred to midnight commit via _pendingRenewals
     } else {
       renderDomains();
     }
@@ -5433,32 +5488,39 @@ function _openDateShiftModal(c, linked) {
         saveDone(doneLog);
         writeCheckToSheet(linked.id, ts);
       }
-      // Recycle the OTO in place — update targetDate to new reminder date, no deletion
+      // Store renewal data pending midnight commit — no sheet writes yet
       if (newNextDue) {
         const def           = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
         const newTargetDate = def && def.getTargetDate
-          ? def.getTargetDate({ ...c, nextDue: newNextDue })
-          : null;
-        if (newTargetDate) {
-          try {
-            const newDueDate = def && def.getDueDate
-              ? def.getDueDate({ ...c, nextDue: newNextDue }) : null;
-            await fetch(API_URL, {
-              method: 'POST', headers: { 'Content-Type': 'text/plain' },
-              body: JSON.stringify({ action: 'updateTask', taskId: linked.id,
-                  fields: { targetdate: newTargetDate,
-                            ...(newDueDate ? { duedate: newDueDate } : {}) } })
-            });
-            // Update local sheetTasks so UI reflects new date immediately
-            const lt = sheetTasks.find(t => t.id === linked.id);
-            if (lt) lt.targetDate = newTargetDate;
-          } catch(e) { console.warn('updateTask failed:', e); }
+          ? def.getTargetDate({ ...c, nextDue: newNextDue }) : null;
+        const newDueDate    = def && def.getDueDate
+          ? def.getDueDate({ ...c, nextDue: newNextDue }) : null;
+        _storePendingRenewal({
+          taskId:          linked.id,
+          criterionId:     c.id,
+          newNextDue,
+          newTargetDate,
+          newDueDate,
+          originalNextDue: c.nextDue,
+          originalTargetDate: linked.targetDate || null,
+        });
+        // Update in-memory only — sheet stays unchanged until midnight
+        const lt = sheetTasks.find(t => t.id === linked.id);
+        if (lt) {
+          lt.targetDate = newTargetDate || lt.targetDate;
+          if (newDueDate) lt.dueDate = newDueDate;
         }
+        // Update criterion in memory so indicator shows correctly
+        const updatedC = { ...c, lastCompleted: completedDate, nextDue: newNextDue, bookedDate: '' };
+        const ci = rawHealthCriteria.findIndex(r => r.id === c.id);
+        if (ci >= 0) rawHealthCriteria[ci] = updatedC;
+        try {
+          const cache = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
+          cache.hc = rawHealthCriteria;
+          localStorage.setItem('hd_history_cache', JSON.stringify(cache));
+        } catch(e) {}
       }
     }
-
-    // Sync and re-render — no regeneration needed, task was recycled in place
-    await syncFromSheet();
     closeDomainModal();
     render();
     if (currentView === 'domains') renderDomains();
@@ -5972,6 +6034,25 @@ function toggleTask(id) {
     delete doneLog[key];
     _localOrigin.delete(key); // unchecked locally — sync can now freely add/remove
     saveDone(doneLog);
+    // Revert any pending renewal for this task
+    const _pr = _getPendingRenewals()[id];
+    if (_pr) {
+      // Revert in-memory sheetTask targetDate
+      const _lt = sheetTasks.find(t => t.id === id);
+      if (_lt && _pr.originalTargetDate !== undefined) _lt.targetDate = _pr.originalTargetDate;
+      // Revert criterion in memory
+      const _ci = rawHealthCriteria.findIndex(r => r.id === _pr.criterionId);
+      if (_ci >= 0) {
+        rawHealthCriteria[_ci] = { ...rawHealthCriteria[_ci],
+          lastCompleted: '', nextDue: _pr.originalNextDue || rawHealthCriteria[_ci].nextDue };
+        try {
+          const cache = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
+          cache.hc = rawHealthCriteria;
+          localStorage.setItem('hd_history_cache', JSON.stringify(cache));
+        } catch(e) {}
+      }
+      _clearPendingRenewal(id);
+    }
     renderInPlace();
     writeUncheckToSheet(id);
   } else {
