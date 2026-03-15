@@ -5486,9 +5486,18 @@ function _openDateShiftModal(c, linked) {
     const nextDueEl     = document.getElementById('dm-next-due');
     const newNextDue    = nextDueEl ? nextDueEl.value : c.nextDue;
 
-    // Update HealthCriteria
-    const updated = { ...c, lastCompleted: completedDate, nextDue: newNextDue || c.nextDue, bookedDate: '' };
-    await _saveAndRefresh(updated);
+    // Capture originals BEFORE any mutation
+    const originalNextDue       = c.nextDue;
+    const originalLastCompleted = c.lastCompleted || '';
+
+    // Update criterion in memory only — no sheet write until midnight commit
+    const ci = rawHealthCriteria.findIndex(r => r.id === c.id);
+    if (ci >= 0) rawHealthCriteria[ci] = { ...c, lastCompleted: completedDate, nextDue: newNextDue || c.nextDue, bookedDate: '' };
+    try {
+      const _ch = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
+      _ch.hc = rawHealthCriteria;
+      localStorage.setItem('hd_history_cache', JSON.stringify(_ch));
+    } catch(e) {}
 
     // Mark linked OTO done for today (non-permanent until midnight commit)
     if (linked && (linked.type === 'once' || linked.freq === 'once')) {
@@ -5500,7 +5509,7 @@ function _openDateShiftModal(c, linked) {
         saveDone(doneLog);
         writeCheckToSheet(linked.id, ts);
       }
-      // Store renewal data pending midnight commit — no sheet writes yet
+      // Store renewal pending midnight — use captured originals
       if (newNextDue) {
         const def           = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
         const newTargetDate = def && def.getTargetDate
@@ -5514,31 +5523,22 @@ function _openDateShiftModal(c, linked) {
           newNextDue,
           newTargetDate,
           newDueDate,
-          originalNextDue:       c.nextDue,
-          originalLastCompleted: c.lastCompleted || '',
-          originalTargetDate:    linked.targetDate || null,
-          originalDueDate:       linked.dueDate   || null,
+          originalNextDue,
+          originalLastCompleted,
+          originalTargetDate: linked.targetDate || null,
+          originalDueDate:    linked.dueDate   || null,
         });
-        // Update in-memory only — sheet stays unchanged until midnight
+        // Update task in memory only
         const lt = sheetTasks.find(t => t.id === linked.id);
         if (lt) {
           lt.targetDate = newTargetDate || lt.targetDate;
           if (newDueDate) lt.dueDate = newDueDate;
         }
-        // Update criterion in memory so indicator shows correctly
-        const updatedC = { ...c, lastCompleted: completedDate, nextDue: newNextDue, bookedDate: '' };
-        const ci = rawHealthCriteria.findIndex(r => r.id === c.id);
-        if (ci >= 0) rawHealthCriteria[ci] = updatedC;
-        try {
-          const cache = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
-          cache.hc = rawHealthCriteria;
-          localStorage.setItem('hd_history_cache', JSON.stringify(cache));
-        } catch(e) {}
       }
     }
     closeDomainModal();
     render();
-    if (currentView === 'domains') renderDomains();
+    renderDomains();
   };
 
   overlay.classList.add('open');
