@@ -5133,6 +5133,11 @@ function _linkedTaskStatus(task) {
   if (!task) return null;
   const isDone = !!doneLog[task.id + '_' + todayKey];
   if (isDone) return { label: 'DONE TODAY', color: '#4ade80' };
+
+  // Managed OTO with no targetDate yet — pending scheduling, don't show DUE TODAY
+  if ((task.type === 'once' || task.freq === 'once') && !task.targetDate) {
+    return { label: 'Pending scheduling', color: '#333' };
+  }
   // For OTO tasks — use CRITERION_TASKS dueDate if sheet task has stale value
   if ((task.type === 'once' || task.freq === 'once' || task.targetDate) && task.targetDate) {
     const _def2 = typeof CRITERION_TASKS !== 'undefined'
