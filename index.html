@@ -3405,7 +3405,7 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
       if (e.target.closest('.task-chevron')) { wrap.classList.toggle('open'); return; }
       if (e.target.closest('.task-remove')) return;
 
-      // OTO linked to a health criterion that needs date entry — intercept and open date modal
+      // OTO linked to a health criterion that needs modal — intercept and open correct modal
       const _isOTO = task.type === 'once' || task.freq === 'once' || task.targetDate;
       if (_isOTO && !doneLog[task.id + '_' + todayKey]
           && typeof rawHealthCriteria !== 'undefined'
@@ -3414,14 +3414,25 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
         for (const c of rawHealthCriteria) {
           const def = CRITERION_TASKS[c.id];
           if (!def) continue;
-          // Match by linkedTaskId (most reliable) or case-insensitive name
           const nameMatch = def.name && task.name &&
             def.name.toLowerCase().replace(/['']/g,"'") === task.name.toLowerCase().replace(/['']/g,"'");
           if (def.linkedTaskId === task.id || nameMatch) { crit = c; break; }
         }
         if (crit) {
-          const def = CRITERION_TASKS[crit.id];
-          const wt  = (def && def.workflowType) || crit.workflowType || '';
+          const def          = CRITERION_TASKS[crit.id];
+          const wt           = (def && def.workflowType) || crit.workflowType || '';
+          const subChecksRaw = (def && def.subChecks)    || crit.subChecks    || '';
+          // Sub-check workflow
+          if (subChecksRaw) {
+            try {
+              const chks = JSON.parse(subChecksRaw);
+              if (chks && chks.length > 0) {
+                const cMerged = { ...crit, subChecks: subChecksRaw, workflowType: wt };
+                _openSubCheckModal(cMerged, task); return;
+              }
+            } catch(e) {}
+          }
+          // Date-entry workflow
           if (wt === 'simple-date' || wt === 'auto-renew-date') {
             _openDateShiftModal(crit, task); return;
           }
@@ -5065,7 +5076,15 @@ function _linkedTaskStatus(task) {
   if (!task) return null;
   const isDone = !!doneLog[task.id + '_' + todayKey];
   if (isDone) return { label: 'DONE TODAY', color: '#4ade80' };
-  if (task.type === 'once' && task.targetDate) {
+  // For OTO tasks — use CRITERION_TASKS dueDate if sheet task has stale value
+  if ((task.type === 'once' || task.freq === 'once') && task.targetDate) {
+    const _def2 = typeof CRITERION_TASKS !== 'undefined'
+      ? Object.values(CRITERION_TASKS).find(d => d.name === task.name) : null;
+    if (_def2 && _def2.getDueDate) {
+      // Can't call getDueDate without criterion — use task.dueDate or def.dueDate
+      const _dd = task.dueDate || _def2.dueDate || null;
+      if (_dd) task = { ...task, dueDate: _dd };
+    }
     // GET AHEAD OTO: has dueDate — show countdown to actual deadline
     if (task.dueDate) {
       const days = daysUntilDue(task);
@@ -5158,6 +5177,9 @@ function evaluateCriterion(c) {
 // ── Next action text for a criterion ─────────────────────────────────────────
 function criterionNextAction(c) {
   const status = evaluateCriterion(c);
+  // Use CRITERION_TASKS seed nextDue if sheet is stale
+  const def     = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
+  const nextDue = c.nextDue || (def && def.getDueDate ? null : null); // sheet value preferred
 
   if (c.nextDue) {
     const d = new Date(c.nextDue.length === 10 ? c.nextDue + 'T00:00:00' : c.nextDue);
@@ -5372,13 +5394,19 @@ async function _criterionAction(criterionId) {
   if (!c) return;
   const linked = _criterionLinkedTask(c);
 
-  // ── If criterion has subChecks → always walk through modal first ──────────
-  // This is the primary validation path — user must confirm each check
-  if (c.subChecks) {
+  // Use CRITERION_TASKS as source of truth for workflow — sheet may be stale
+  const def          = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[criterionId] : null;
+  const workflowType = (def && def.workflowType) || c.workflowType || '';
+  const subChecksRaw = (def && def.subChecks)    || c.subChecks    || '';
+
+  // ── sub-check workflow ──────────────────────────────────────────────────────
+  if (subChecksRaw) {
     try {
-      const checks = JSON.parse(c.subChecks);
+      const checks = JSON.parse(subChecksRaw);
       if (checks && checks.length > 0) {
-        _openSubCheckModal(c, linked);
+        // Merge def subChecks into c so modal has the right data
+        const cMerged = { ...c, subChecks: subChecksRaw, workflowType };
+        _openSubCheckModal(cMerged, linked);
         return;
       }
     } catch(e) {}
