@@ -5087,14 +5087,22 @@ function _linkedTaskStatus(task) {
       const _dd = task.dueDate || _def2.dueDate || null;
       if (_dd) task = { ...task, dueDate: _dd };
     }
-    // GET AHEAD OTO: has dueDate — show countdown to actual deadline
+    // GET AHEAD OTO: has dueDate — show countdown only within GET AHEAD window
     if (task.dueDate) {
       const days = daysUntilDue(task);
       if (days !== null) {
         if (days <= 0) return { label: 'OVERDUE', color: '#f87171' };
         if (days === 0) return { label: 'DUE TODAY', color: '#facc15' };
         if (days <= 7)  return { label: 'DUE IN ' + days + ' DAYS', color: '#facc15' };
-        return { label: 'GET AHEAD · ' + days + 'd', color: '#7dd3fc', current: true };
+        // Only show GET AHEAD pill if we're on or past the targetDate
+        if (todayKey >= task.targetDate) {
+          return { label: 'GET AHEAD · ' + days + 'd', color: '#7dd3fc', current: true };
+        }
+        // Before targetDate — show the actual due date
+        const now2 = new Date(todayKey + 'T00:00:00');
+        const yr2  = now2.getFullYear();
+        const due2 = parseDueDate(task.dueDate, yr2) || parseDueDate(task.dueDate, yr2+1);
+        return { label: due2 ? 'Next due ' + _fmtDate(dateKey(due2)) : _fmtDate(task.targetDate), color: '#555' };
       }
     }
     // Standard OTO: show targetDate status
