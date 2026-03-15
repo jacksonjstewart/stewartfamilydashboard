@@ -2660,6 +2660,15 @@ async function fetchHistory() {
     rawOTOEvents   = otoEvents;
     rawWeeklyReports  = Array.isArray(data.weeklyReports)  ? data.weeklyReports  : [];
     rawHealthCriteria = Array.isArray(data.healthCriteria) ? data.healthCriteria : [];
+    // Re-apply any pending renewals so in-memory state isn't lost on interval refresh
+    const _pr = _getPendingRenewals();
+    if (Object.keys(_pr).length) {
+      rawHealthCriteria = rawHealthCriteria.map(c => {
+        const match = Object.values(_pr).find(p => p.criterionId === c.id);
+        if (match) return { ...c, lastCompleted: match.completedDate || c.lastCompleted, nextDue: match.newNextDue };
+        return c;
+      });
+    }
     try { localStorage.setItem("hd_history_cache", JSON.stringify({ perm: permanentHistory, raw: rawHistory, oto: rawOTOEvents, wr: rawWeeklyReports, hc: rawHealthCriteria })); } catch(e) {}
   } catch(err) {
     try {
@@ -5247,6 +5256,9 @@ async function checkAndGenerateOTOs() {
         const wrongType   = existing.type !== 'once' && existing.freq !== 'once';
         const wrongTarget = existing.targetDate !== correctTarget;
         if (wrongType || wrongTarget) {
+          // Skip if a pending renewal exists — it will handle the sheet write at midnight
+          const _pending = _getPendingRenewals();
+          if (_pending[existing.id]) continue;
           // Recycle in place — update the existing row, no deletion
           try {
             await fetch(API_URL, {
@@ -5498,6 +5510,7 @@ function _openDateShiftModal(c, linked) {
         _storePendingRenewal({
           taskId:             linked.id,
           criterionId:        c.id,
+          completedDate,
           newNextDue,
           newTargetDate,
           newDueDate,
