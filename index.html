@@ -4843,9 +4843,9 @@ const CRITERION_TASKS = {
     name: 'Confirm auto-renewal & verify insurance docs',
     emoji: '🛡️', freq: 'once', type: 'once',
     workflowType: 'sub-check',
-    dueDate: '07-01',
+    dueDate: '06-12',
     getTargetDate: (c) => {
-      // Always target June 1 of the relevant year (30 days before Jul 1)
+      // Always target 30 days before Jun 12 = May 13
       if (!c.nextDue) return dateKey(new Date());
       const ms = Date.UTC(
         parseInt(c.nextDue.slice(0,4)),
@@ -4854,7 +4854,7 @@ const CRITERION_TASKS = {
       ) - 30 * 864e5;
       return dateKey(new Date(ms));
     },
-    getDueDate: (c) => c.nextDue ? c.nextDue.slice(5) : '07-01',
+    getDueDate: (c) => c.nextDue ? c.nextDue.slice(5) : '06-12',
     subChecks: JSON.stringify([
       { id: 'ins-app',      label: 'Insurance policy is current on my phone app (not expired)' },
       { id: 'ins-physical', label: 'Physical copy of insurance is in the glove box' },
@@ -5077,7 +5077,7 @@ function _linkedTaskStatus(task) {
   const isDone = !!doneLog[task.id + '_' + todayKey];
   if (isDone) return { label: 'DONE TODAY', color: '#4ade80' };
   // For OTO tasks — use CRITERION_TASKS dueDate if sheet task has stale value
-  if ((task.type === 'once' || task.freq === 'once') && task.targetDate) {
+  if ((task.type === 'once' || task.freq === 'once' || task.targetDate) && task.targetDate) {
     const _def2 = typeof CRITERION_TASKS !== 'undefined'
       ? Object.values(CRITERION_TASKS).find(d => d.name === task.name) : null;
     if (_def2 && _def2.getDueDate) {
@@ -5481,10 +5481,16 @@ function _openSubCheckModal(c, linked) {
     const checks2 = (() => { try { return JSON.parse(c.subChecks); } catch(e) { return []; } })();
     if (!checks2.every(chk => !!_dmSubState[chk.id])) return; // guard
 
-    // Compute nextDue — always next July 1
-    const now   = new Date();
-    const year  = now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear();
-    const newNextDue = year + '-07-01';
+    // Compute nextDue — always next Jun 12 (actual auto-renewal date)
+    // Use criterion's own nextDue pattern if available, else default to Jun 12
+    const _cdef   = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
+    const _dueMMDD = (_cdef && _cdef.dueDate) || c.nextDue && c.nextDue.slice(5) || '06-12';
+    const _dueM   = parseInt(_dueMMDD.slice(0,2)) - 1;
+    const _dueD   = parseInt(_dueMMDD.slice(3,5));
+    const now     = new Date();
+    const year    = (now.getMonth() > _dueM || (now.getMonth() === _dueM && now.getDate() >= _dueD))
+                  ? now.getFullYear() + 1 : now.getFullYear();
+    const newNextDue = year + '-' + _dueMMDD;
     const def        = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
     const newTargetDate = def && def.getTargetDate
       ? def.getTargetDate({ ...c, nextDue: newNextDue }) : null;
