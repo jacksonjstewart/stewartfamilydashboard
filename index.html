@@ -3499,7 +3499,7 @@ function render() {
     
     // ── 2. GET AHEAD — collected here, rendered AFTER recurring (see below) ──────
     const getAheadTasks = todayTasks.filter(t =>
-      t.type !== 'once' && t.dueDate && isGetAheadTask(t) && !isDueOn(t, today)
+      t.dueDate && isGetAheadTask(t) && !(t.type !== 'once' && isDueOn(t, today))
     );
 
     // ── 3. RECURRING — sections with incomplete tasks first, fully-done sections last ──
@@ -3585,7 +3585,7 @@ function render() {
       const permEntry = permanentHistory[task.id];
       const permStamp = (!isDone && permEntry && permEntry.dateKey !== todayKey)
         ? 'Last completed ' + formatStamp(permEntry.completedAt, permEntry.who) : null;
-      const row = buildTaskRow(task, false, isDone, isCustom, tempStamp || permStamp, false, isDone ? null : getAheadLabel(task));
+      const row = buildTaskRow(task, task.type === 'once' || task.freq === 'once', isDone, isCustom, tempStamp || permStamp, false, isDone ? null : getAheadLabel(task));
       aBody.appendChild(row);
     });
   }
@@ -4976,6 +4976,17 @@ function _linkedTaskStatus(task) {
   const isDone = !!doneLog[task.id + '_' + todayKey];
   if (isDone) return { label: 'DONE TODAY', color: '#4ade80' };
   if (task.type === 'once' && task.targetDate) {
+    // GET AHEAD OTO: has dueDate — show countdown to actual deadline
+    if (task.dueDate) {
+      const days = daysUntilDue(task);
+      if (days !== null) {
+        if (days <= 0) return { label: 'OVERDUE', color: '#f87171' };
+        if (days === 0) return { label: 'DUE TODAY', color: '#facc15' };
+        if (days <= 7)  return { label: 'DUE IN ' + days + ' DAYS', color: '#facc15' };
+        return { label: 'GET AHEAD · ' + days + 'd', color: '#7dd3fc', current: true };
+      }
+    }
+    // Standard OTO: show targetDate status
     const diff = Math.round(
       (new Date(task.targetDate + 'T00:00:00') - new Date(todayKey + 'T00:00:00')) / 864e5
     );
@@ -5080,7 +5091,17 @@ function criterionNextAction(c) {
   // No nextDue or lastCompleted — try linked task
   const linked = _criterionLinkedTask(c);
   if (linked) {
-    if (linked.type === 'once' && linked.targetDate) {
+    // For OTO tasks: show dueDate (actual deadline) not targetDate (reminder date)
+    if ((linked.type === 'once' || linked.freq === 'once') && linked.dueDate) {
+      const days = daysUntilDue(linked);
+      if (days !== null) {
+        const now  = new Date(todayKey + 'T00:00:00');
+        const year = now.getFullYear();
+        const due  = parseDueDate(linked.dueDate, year) || parseDueDate(linked.dueDate, year+1);
+        if (due) return (days <= 0 ? 'Overdue - ' : 'Due ') + _fmtDate(dateKey(due));
+      }
+    }
+    if ((linked.type === 'once' || linked.freq === 'once') && linked.targetDate) {
       return 'Scheduled ' + _fmtDate(linked.targetDate);
     }
     const next = _nextOccurrence(linked);
