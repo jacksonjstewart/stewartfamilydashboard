@@ -3158,6 +3158,15 @@ async function performCommit(_dateKey) {  // _dateKey unused — todayKey is glo
                         ...(pr.newDueDate ? { duedate: pr.newDueDate } : {}) } })
           });
         }
+        // Flush linked task update (e.g. veh-oil-do targetDate after booking)
+        if (pr.linkedTaskUpdate) {
+          await fetch(API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'updateTask',
+              taskId: pr.linkedTaskUpdate.taskId,
+              fields: pr.linkedTaskUpdate })
+          });
+        }
         _clearPendingRenewal(taskId);
       } catch(e) { console.warn('Pending renewal flush failed:', taskId, e); }
     }
@@ -4735,20 +4744,33 @@ function _renderDomainsInner(el) {
         // Find linked OTO or recurring task
         const linkedTask   = _criterionLinkedTask(c);
         const linkedStatus = linkedTask ? _linkedTaskStatus(linkedTask) : null;
-        const linkedHTML = linkedTask
+
+        // For two-task criteria (oil change): find second task by permanentId
+        const _allTasksForLinked = [...sheetTasks, ...customTasks];
+        const linkedTask2  = c.id === 'veh-oil-change'
+          ? (_allTasksForLinked.find(t => t.id === 'veh-oil-do') ||
+             _allTasksForLinked.find(t => t.name === 'Perform oil change & inspection'))
+          : null;
+        const linkedStatus2 = linkedTask2 ? _linkedTaskStatus(linkedTask2) : null;
+
+        const _buildLinkedRow = (lt, ls, def2) => lt
           ? `<div class="criterion-linked-task">
-              <span class="criterion-linked-dot ${status}"></span>
+              <span class="criterion-linked-dot ${ls && ls.color === '#f87171' ? 'red' : ls && ls.color === '#facc15' ? 'amber' : 'green'}"></span>
               <div style="flex:1;min-width:0">
-                <div class="criterion-linked-name">${linkedTask.name}${ctDef && ctDef.validated ? ' <span style="color:#4ade80;font-size:10px">\u2713</span>' : ''}</div>
-                <div class="criterion-linked-freq">${freqLabel(linkedTask) || (linkedTask.type === 'once' ? 'One time only' : '')}</div>
+                <div class="criterion-linked-name">${lt.name}${def2 && def2.validated ? ' <span style="color:#4ade80;font-size:10px">\u2713</span>' : ''}</div>
+                <div class="criterion-linked-freq">${freqLabel(lt) || (lt.type === 'once' ? 'One time only' : '')}</div>
               </div>
-              <div class="criterion-linked-status" style="color:${linkedStatus ? linkedStatus.color : '#444'}">
-                ${linkedStatus && linkedStatus.current ? '<span class="linked-current-badge">CURRENT</span> ' : ''}${linkedStatus ? linkedStatus.label : ''}
+              <div class="criterion-linked-status" style="color:${ls ? ls.color : '#444'}">
+                ${ls && ls.current ? '<span class="linked-current-badge">CURRENT</span> ' : ''}${ls ? ls.label : ''}
               </div>
              </div>`
           : `<div class="criterion-linked-task">
               <span class="criterion-linked-name" style="color:#2a2a2a;font-style:italic">Linked task will appear after next sync…</span>
              </div>`;
+
+        const ctDef2 = linkedTask2 && typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS['veh-oil-do'] : null;
+        const linkedHTML = _buildLinkedRow(linkedTask, linkedStatus, ctDef)
+          + (linkedTask2 ? _buildLinkedRow(linkedTask2, linkedStatus2, ctDef2) : '');
 
         detail.innerHTML = `
           <div class="criterion-detail-status">${statusLine}</div>
@@ -4866,15 +4888,40 @@ const CRITERION_TASKS = {
   },
   'veh-oil-change': {
     linkedTaskId: null,
-    name: 'Book oil change & mechanic inspection',
-    emoji: '🔧', freq: 'once', type: 'once',
+    permanentId:  'veh-oil-book',
+    name: 'Book oil change & inspection',
+    emoji: '📅', freq: 'once', type: 'once',
+    workflowType: 'simple-date',
+    hardDeadline: false,
     getTargetDate: (c) => {
+      // GET AHEAD starts 30d before booking deadline
       if (!c.nextDue) return dateKey(new Date());
-      const d = new Date(c.nextDue + 'T00:00:00');
-      d.setDate(d.getDate() - (parseInt(c.warningDays) || 30));
-      return dateKey(d);
+      const ms = Date.UTC(
+        parseInt(c.nextDue.slice(0,4)),
+        parseInt(c.nextDue.slice(5,7)) - 1,
+        parseInt(c.nextDue.slice(8,10))
+      ) - 30 * 864e5;
+      return dateKey(new Date(ms));
     },
-    notes: 'Book at Toyota of the Trail (free lifetime oil changes). Record booking date in DOMAINS.',
+    getDueDate: (c) => c.nextDue ? c.nextDue.slice(5) : null,
+    notes: 'Book at Toyota of the Trail (free lifetime oil changes).',
+    validated: true,
+  },
+  'veh-oil-do': {
+    linkedTaskId: null,
+    permanentId:  'veh-oil-do',
+    name: 'Perform oil change & inspection',
+    emoji: '🔧', freq: 'once', type: 'once',
+    workflowType: 'sub-check',
+    hardDeadline: true,
+    getTargetDate: (c) => c.bookedDate || null, // surfaces on appointment date
+    getDueDate: (c) => c.bookedDate ? c.bookedDate.slice(5) : null,
+    subChecks: JSON.stringify([
+      { id: 'oil-done',    label: 'Oil and filter have been changed' },
+      { id: 'car-healthy', label: 'Car inspected — no issues flagged by mechanic' },
+    ]),
+    notes: 'Free lifetime oil changes at Toyota of the Trail.',
+    validated: true,
   },
   'veh-tires': {
     linkedTaskId: null,
@@ -5129,6 +5176,10 @@ function _linkedTaskStatus(task) {
     const isDone = !!doneLog[task.id + '_' + todayKey];
     if (!isDone) return { label: 'DUE TODAY', color: '#facc15', current: true };
   }
+  // OTO with no targetDate yet — pending scheduling
+  if (task.type === 'once' || task.freq === 'once') {
+    return { label: 'Pending scheduling', color: '#333' };
+  }
   // Recurring — compute actual next occurrence date
   const next = _nextOccurrence(task);
   return { label: next ? _fmtDate(next) : freqLabel(task), color: '#555' };
@@ -5171,7 +5222,14 @@ function evaluateCriterion(c) {
   }
 
   // ── Red: genuinely overdue with no completion ─────────────────────────────
-  if (c.nextDue && todayDk > c.nextDue) return 'red';
+  if (c.nextDue && todayDk > c.nextDue) {
+    // Oil change: only red if 30+ days overdue (1 month grace)
+    if (c.id === 'veh-oil-change') {
+      const daysOver = Math.round((now - new Date(c.nextDue + 'T00:00:00')) / 864e5);
+      return daysOver >= 30 ? 'red' : 'amber';
+    }
+    return 'red';
+  }
   if (c.lastCompleted) {
     const last       = new Date(c.lastCompleted + 'T00:00:00');
     const intervalMs = (parseInt(c.interval)||1) *
@@ -5380,6 +5438,35 @@ async function checkAndGenerateOTOs() {
     }
   }
 
+  // Special: veh-oil-do shares the veh-oil-change criterion row
+  // Ensure veh-oil-do task exists — it's always present, targetDate = bookedDate
+  if (typeof CRITERION_TASKS !== 'undefined' && CRITERION_TASKS['veh-oil-do']) {
+    const _doAllTasks = [...sheetTasks, ...customTasks];
+    const _doDef = CRITERION_TASKS['veh-oil-do'];
+    const _doCrit = rawHealthCriteria.find(r => r.id === 'veh-oil-change');
+    const _doExisting = _doAllTasks.find(t => t.id === 'veh-oil-do' || t.name === _doDef.name);
+    if (!_doExisting && !_getPendingRenewals()['veh-oil-do']) {
+      // Create veh-oil-do task — targetDate = bookedDate if set, else null (pending scheduling)
+      const _doTask = {
+        id:         'veh-oil-do',
+        name:       _doDef.name,
+        emoji:      _doDef.emoji,
+        section:    'vehicle',
+        freq:       'once',
+        type:       'once',
+        notes:      _doDef.notes,
+        targetDate: _doCrit && _doCrit.bookedDate ? _doCrit.bookedDate : '',
+        dueDate:    _doCrit && _doCrit.bookedDate ? _doCrit.bookedDate.slice(5) : '',
+      };
+      try {
+        await fetch(API_URL, {
+          method: 'POST', headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'addTask', task: _doTask })
+        });
+      } catch(e) {}
+    }
+  }
+
   // Always sync so linked task display is current
   await syncFromSheet();
   // Repair any biweekly tasks that ended up without an anchor date
@@ -5494,7 +5581,22 @@ function _openSubCheckModal(c, linked) {
     // Compute nextDue — always next Jun 12 (actual auto-renewal date)
     // Use criterion's own nextDue pattern if available, else default to Jun 12
     const _cdef   = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
-    const _dueMMDD = (_cdef && _cdef.dueDate) || c.nextDue && c.nextDue.slice(5) || '06-12';
+    // For oil-do: next cycle dates computed from completion
+    let _dueMMDD, _bookNewNextDue, _bookNewTargetDate;
+    if (c.id === 'veh-oil-do' || (linked && linked.id === 'veh-oil-do')) {
+      // Next oil change = today + 6 months
+      const _nextOil = new Date(todayKey + 'T00:00:00');
+      _nextOil.setMonth(_nextOil.getMonth() + 6);
+      // Booking deadline = next oil change - 1 month
+      const _bookBy  = new Date(_nextOil); _bookBy.setMonth(_bookBy.getMonth() - 1);
+      // Book GET AHEAD start = bookBy - 30d
+      const _bookGA  = new Date(_bookBy.getTime() - 30 * 864e5);
+      _bookNewNextDue    = dateKey(_bookBy);      // new dueDate for veh-oil-book
+      _bookNewTargetDate = dateKey(_bookGA);       // new targetDate for veh-oil-book
+      _dueMMDD           = _bookNewNextDue.slice(5);
+    } else {
+      _dueMMDD = (_cdef && _cdef.dueDate) || c.nextDue && c.nextDue.slice(5) || '06-12';
+    }
     const _dueM   = parseInt(_dueMMDD.slice(0,2)) - 1;
     const _dueD   = parseInt(_dueMMDD.slice(3,5));
     const now     = new Date();
@@ -5596,6 +5698,7 @@ function _openDateShiftModal(c, linked) {
     f2.className = 'dm-field';
     const hint = c.id === 'veh-license'     ? 'New licence expiry date'
                : c.id === 'veh-registration' ? 'New registration expiry date'
+               : c.id === 'veh-oil-change' ? 'Appointment date'
                : 'Next renewal date';
     f2.innerHTML = `<div class="dm-field-label">${hint.toUpperCase()}</div>
       <input type="date" class="dm-date-input" id="dm-next-due" value="${c.nextDue||''}" />
@@ -5648,6 +5751,18 @@ function _openDateShiftModal(c, linked) {
           ? def.getTargetDate({ ...c, nextDue: newNextDue }) : null;
         const newDueDate    = def && def.getDueDate
           ? def.getDueDate({ ...c, nextDue: newNextDue }) : null;
+        // For oil-change booking: also update veh-oil-do's targetDate to appointment date
+        let linkedTaskUpdate = null;
+        if (c.id === 'veh-oil-change') {
+          const doTask = sheetTasks.find(t => t.id === 'veh-oil-do') ||
+                         sheetTasks.find(t => t.name === 'Perform oil change & inspection');
+          if (doTask) {
+            linkedTaskUpdate = { taskId: doTask.id, targetdate: newNextDue, duedate: newNextDue ? newNextDue.slice(5) : '' };
+            // Update veh-oil-do in memory
+            doTask.targetDate = newNextDue;
+            doTask.dueDate    = newNextDue ? newNextDue.slice(5) : doTask.dueDate;
+          }
+        }
         _storePendingRenewal({
           taskId:             linked.id,
           criterionId:        c.id,
@@ -5659,6 +5774,7 @@ function _openDateShiftModal(c, linked) {
           originalLastCompleted,
           originalTargetDate: linked.targetDate || null,
           originalDueDate:    linked.dueDate   || null,
+          linkedTaskUpdate,
         });
         // Update task in memory only
         const lt = sheetTasks.find(t => t.id === linked.id);
