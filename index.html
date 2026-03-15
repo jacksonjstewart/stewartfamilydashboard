@@ -3151,14 +3151,22 @@ async function performCommit(_dateKey) {  // _dateKey unused — todayKey is glo
         // Write new nextDue + lastCompleted to HealthCriteria
         const crit = rawHealthCriteria.find(r => r.id === pr.criterionId);
         if (crit) {
+          // For booking-date: save appointment as bookedDate, keep nextDue (booking deadline)
+          // For renewals: save new expiry as nextDue
+          const _isBooking   = pr.workflowType === 'booking-date';
+          const _isOilDoDone = pr.workflowType === 'oil-do-completion';
+          const _critUpdate = _isBooking
+            ? { ...crit, lastCompleted: todayKey, bookedDate: pr.newNextDue }
+            : _isOilDoDone
+            ? { ...crit, lastCompleted: todayKey, bookedDate: '', nextDue: pr.newNextDue }
+            : { ...crit, lastCompleted: todayKey, nextDue: pr.newNextDue, bookedDate: '' };
           await fetch(API_URL, {
             method: 'POST', headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'saveHealthCriterion',
-              criterion: { ...crit, lastCompleted: todayKey, nextDue: pr.newNextDue, bookedDate: '' } })
+            body: JSON.stringify({ action: 'saveHealthCriterion', criterion: _critUpdate })
           });
         }
-        // Recycle DESIGN row with new targetDate
-        if (pr.newTargetDate) {
+        // Recycle DESIGN row with new targetDate (skip for booking-date — veh-oil-book keeps its dates)
+        if (pr.newTargetDate && pr.workflowType !== 'booking-date') {
           await fetch(API_URL, {
             method: 'POST', headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'updateTask', taskId,
@@ -3430,12 +3438,34 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
           && typeof rawHealthCriteria !== 'undefined'
           && typeof CRITERION_TASKS !== 'undefined') {
         let crit = null;
+        // First: try matching via rawHealthCriteria → CRITERION_TASKS
         for (const c of rawHealthCriteria) {
           const def = CRITERION_TASKS[c.id];
           if (!def) continue;
           const nameMatch = def.name && task.name &&
             def.name.toLowerCase().replace(/['']/g,"'") === task.name.toLowerCase().replace(/['']/g,"'");
           if (def.linkedTaskId === task.id || nameMatch) { crit = c; break; }
+        }
+        // Second: match chain tasks by permanentId (e.g. veh-oil-do has no criterion row)
+        if (!crit) {
+          const _chainDef = Object.values(CRITERION_TASKS).find(d =>
+            d.permanentId === task.id || (d.name && task.name &&
+            d.name.toLowerCase() === task.name.toLowerCase())
+          );
+          if (_chainDef) {
+            // Find the parent criterion row
+            const _parentCritId = Object.keys(CRITERION_TASKS).find(k => CRITERION_TASKS[k] === _chainDef)
+              || Object.keys(CRITERION_TASKS).find(k =>
+                  CRITERION_TASKS[k].permanentId === task.id ||
+                  (CRITERION_TASKS[k].subChecks && CRITERION_TASKS[k].name === task.name));
+            // For veh-oil-do: parent criterion is veh-oil-change
+            const _parentId = task.id === 'veh-oil-do' ? 'veh-oil-change' : _parentCritId;
+            crit = rawHealthCriteria.find(r => r.id === _parentId) || null;
+            if (crit && _chainDef.subChecks) {
+              // Merge chain task's subChecks into criterion for modal
+              crit = { ...crit, subChecks: _chainDef.subChecks, workflowType: _chainDef.workflowType };
+            }
+          }
         }
         if (crit) {
           const def          = CRITERION_TASKS[crit.id];
@@ -3452,7 +3482,7 @@ function buildTaskRow(task, isOnce, isDone, isCustom, stampText, isReadOnly, ahe
             } catch(e) {}
           }
           // Date-entry workflow
-          if (wt === 'simple-date' || wt === 'auto-renew-date') {
+          if (wt === 'simple-date' || wt === 'auto-renew-date' || wt === 'booking-date') {
             _openDateShiftModal(crit, task); return;
           }
         }
@@ -4899,7 +4929,7 @@ const CRITERION_TASKS = {
     permanentId:  'veh-oil-book',
     name: 'Book oil change & inspection',
     emoji: '📅', freq: 'once', type: 'once',
-    workflowType: 'simple-date',
+    workflowType: 'booking-date',
     hardDeadline: false,
     getTargetDate: (c) => {
       // GET AHEAD starts 30d before booking deadline
@@ -5250,6 +5280,9 @@ function evaluateCriterion(c) {
     if (now > new Date(last.getTime() + intervalMs)) return 'red';
   }
 
+  // ── Booked: appointment scheduled — satisfied ───────────────────────────────
+  if (c.id === 'veh-oil-change' && c.bookedDate) return 'green';
+
   // ── Everything else is green: future OTO, future recurring, future nextDue ─
   // "Pending/booked action item in the future" = healthy
   return 'green';
@@ -5504,6 +5537,21 @@ async function _criterionAction(criterionId) {
   if (!c) return;
   const linked = _criterionLinkedTask(c);
 
+  // Oil change chain: if appointment booked and today >= appointment date → perform modal
+  if (criterionId === 'veh-oil-change' && c.bookedDate) {
+    const doTask = [...sheetTasks, ...customTasks].find(t =>
+      t.id === 'veh-oil-do' || t.name === 'Perform oil change & inspection'
+    );
+    if (doTask && !doneLog[doTask.id + '_' + todayKey]) {
+      const doDef = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS['veh-oil-do'] : null;
+      if (doDef && doDef.subChecks) {
+        const cMerged = { ...c, subChecks: doDef.subChecks, workflowType: 'sub-check' };
+        _openSubCheckModal(cMerged, doTask);
+        return;
+      }
+    }
+  }
+
   // Use CRITERION_TASKS as source of truth for workflow — sheet may be stale
   const def          = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[criterionId] : null;
   const workflowType = (def && def.workflowType) || c.workflowType || '';
@@ -5593,7 +5641,11 @@ function _openSubCheckModal(c, linked) {
 
     // Compute nextDue — always next Jun 12 (actual auto-renewal date)
     // Use criterion's own nextDue pattern if available, else default to Jun 12
-    const _cdef   = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
+    // Use the correct def — for chain tasks use the linked task's def
+    const _linkedDef = linked && typeof CRITERION_TASKS !== 'undefined'
+      ? Object.values(CRITERION_TASKS).find(d => d.permanentId === linked.id || d.name === linked.name)
+      : null;
+    const _cdef   = _linkedDef || (typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null);
     // For oil-do: next cycle dates computed from completion
     let _dueMMDD, _bookNewNextDue, _bookNewTargetDate;
     if (c.id === 'veh-oil-do' || (linked && linked.id === 'veh-oil-do')) {
@@ -5678,6 +5730,37 @@ function _openSubCheckModal(c, linked) {
         originalDueDate:    null,
       });
     }
+
+    // For veh-oil-do: also update veh-oil-book for next cycle and clear bookedDate
+    if (linked && (linked.id === 'veh-oil-do' || linked.name === 'Perform oil change & inspection')) {
+      const bookTask = [...sheetTasks, ...customTasks].find(t =>
+        t.id === 'veh-oil-book' || t.name === 'Book oil change & inspection'
+      );
+      if (bookTask && _bookNewNextDue) {
+        // Update veh-oil-book in memory for next cycle
+        bookTask.targetDate = _bookNewTargetDate || bookTask.targetDate;
+        bookTask.dueDate    = _bookNewNextDue.slice(5);
+        // Store pending for veh-oil-book update at midnight
+        _storePendingRenewal({
+          taskId:             bookTask.id,
+          criterionId:        c.id,
+          workflowType:       'oil-do-completion',
+          completedDate:      todayKey,
+          newNextDue:         _bookNewNextDue,   // new booking deadline
+          newTargetDate:      _bookNewTargetDate, // new GET AHEAD start
+          newDueDate:         _bookNewNextDue.slice(5),
+          originalNextDue:    bookTask.dueDate || '',
+          originalLastCompleted: '',
+          originalTargetDate: bookTask.targetDate || null,
+          originalDueDate:    bookTask.dueDate   || null,
+          linkedTaskUpdate:   { taskId: linked.id, targetdate: '', duedate: '' }, // reset veh-oil-do
+        });
+        // Clear bookedDate in memory — oil change done, next cycle starts fresh
+        const _cIdx = rawHealthCriteria.findIndex(r => r.id === c.id);
+        if (_cIdx >= 0) rawHealthCriteria[_cIdx] = { ...rawHealthCriteria[_cIdx], bookedDate: '' };
+      }
+    }
+
     closeDomainModal();
     render();
     renderDomains();
@@ -5705,8 +5788,9 @@ function _openDateShiftModal(c, linked) {
     <input type="date" class="dm-date-input" id="dm-completed-date" value="${todayKey}" />`;
   body.appendChild(f1);
 
-  // New expiry / next due (for renewals)
-  if (isRenewal) {
+  // New expiry / next due (for renewals) OR appointment date (for bookings)
+  const isBooking = c.id === 'veh-oil-change';
+  if (isRenewal || isBooking) {
     const f2 = document.createElement('div');
     f2.className = 'dm-field';
     const hint = c.id === 'veh-license'     ? 'New licence expiry date'
@@ -5714,11 +5798,11 @@ function _openDateShiftModal(c, linked) {
                : c.id === 'veh-oil-change' ? 'Appointment date'
                : 'Next renewal date';
     f2.innerHTML = `<div class="dm-field-label">${hint.toUpperCase()}</div>
-      <input type="date" class="dm-date-input" id="dm-next-due" value="${c.nextDue||''}" />
-      <div class="criterion-instructions" style="margin-top:6px">
-        Completing early? Enter the actual new expiry/renewal date — the app will
-        reschedule the next reminder from this date, not the original due date.
-      </div>`;
+      <input type="date" class="dm-date-input" id="dm-next-due" value="${isBooking ? (c.bookedDate||'') : (c.nextDue||'')}" />
+      <div class="criterion-instructions" style="margin-top:6px">${isBooking
+        ? 'Enter the actual appointment date. The next booking reminder will be set automatically 6 months after completion.'
+        : 'Completing early? Enter the actual new expiry/renewal date — the app will reschedule the next reminder from this date.'
+      }</div>`;
     body.appendChild(f2);
   }
 
@@ -5739,8 +5823,12 @@ function _openDateShiftModal(c, linked) {
     const originalLastCompleted = c.lastCompleted || '';
 
     // Update criterion in memory only — no sheet write until midnight commit
+    const _isBookingWF = (typeof CRITERION_TASKS !== 'undefined' && CRITERION_TASKS[c.id])
+      ? CRITERION_TASKS[c.id].workflowType === 'booking-date' : false;
     const ci = rawHealthCriteria.findIndex(r => r.id === c.id);
-    if (ci >= 0) rawHealthCriteria[ci] = { ...c, lastCompleted: completedDate, nextDue: newNextDue || c.nextDue, bookedDate: '' };
+    if (ci >= 0) rawHealthCriteria[ci] = _isBookingWF
+      ? { ...c, lastCompleted: completedDate, bookedDate: newNextDue || '' }
+      : { ...c, lastCompleted: completedDate, nextDue: newNextDue || c.nextDue, bookedDate: '' };
     try {
       const _ch = JSON.parse(localStorage.getItem('hd_history_cache') || '{}');
       _ch.hc = rawHealthCriteria;
@@ -5779,6 +5867,8 @@ function _openDateShiftModal(c, linked) {
         _storePendingRenewal({
           taskId:             linked.id,
           criterionId:        c.id,
+          workflowType:       (typeof CRITERION_TASKS !== 'undefined' && CRITERION_TASKS[c.id])
+                              ? CRITERION_TASKS[c.id].workflowType : (c.workflowType || ''),
           completedDate,
           newNextDue,
           newTargetDate,
