@@ -5504,7 +5504,7 @@ function _openSubCheckModal(c, linked) {
     const def        = typeof CRITERION_TASKS !== 'undefined' ? CRITERION_TASKS[c.id] : null;
     const newTargetDate = def && def.getTargetDate
       ? def.getTargetDate({ ...c, nextDue: newNextDue }) : null;
-    const newDueDate = '07-01';
+    const newDueDate = _dueMMDD;
 
     // Capture originals before mutation
     const originalNextDue       = c.nextDue;
@@ -5519,7 +5519,7 @@ function _openSubCheckModal(c, linked) {
       localStorage.setItem('hd_history_cache', JSON.stringify(_ch));
     } catch(e) {}
 
-    // Mark linked task done for today (non-permanent until midnight)
+    // Mark linked task done and store pending — both require linked task to exist
     if (linked) {
       const key = linked.id + '_' + todayKey;
       if (!doneLog[key]) {
@@ -5548,6 +5548,20 @@ function _openSubCheckModal(c, linked) {
         if (newTargetDate) lt.targetDate = newTargetDate;
         lt.dueDate = newDueDate;
       }
+    } else {
+      // No linked task yet — store a criterion-only pending so uncheck can revert criterion
+      _storePendingRenewal({
+        taskId:             'criterion_' + c.id,
+        criterionId:        c.id,
+        completedDate:      todayKey,
+        newNextDue,
+        newTargetDate:      null,
+        newDueDate,
+        originalNextDue,
+        originalLastCompleted,
+        originalTargetDate: null,
+        originalDueDate:    null,
+      });
     }
     closeDomainModal();
     render();
